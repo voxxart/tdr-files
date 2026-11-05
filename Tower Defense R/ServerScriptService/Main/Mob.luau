@@ -31,14 +31,4 @@ function mob.Explode(...)
 	return EnemyService.Explode(...)
 end
 
-function mob.SetEffects(model)
-	return model
-end
-
--- Legacy entry points are intentionally no-ops:
--- compatibility Effect values are captured by EnemyService.
-function mob.Burning() end
-function mob.Bleeding() end
-function mob.Stunned() end
-
 return mob

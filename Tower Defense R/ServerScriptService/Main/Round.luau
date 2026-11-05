@@ -21,6 +21,7 @@ local m = workspace.Info.Min
 local s = workspace.Info.Sec
 local st = workspace.Info.SkipTime
 
+local Match = require(game.ServerScriptService.Simulation.MatchService)
 local round = {}
 local votes = {}
 local ModifierVotes = {}
@@ -42,7 +43,8 @@ function round.StartGame()
 	elseif mode == "Hard" then
 		waves = 32
 	end
-	info.GameRunning.Value = true
+	info.Message.Value = ""
+	local generation = Match.Begin()
 
 
 	for i = 12, 0, -1 do
@@ -51,12 +53,13 @@ function round.StartGame()
 		else
 			info.Timer.Value = "00:" .. i
 		end
-		wait(1 / workspace.Info.GameSpeed.Value)
+		if not Match.Wait(generation, 1) then return end
 		info.Message.Value = ""
 		game.StarterGui.GameGui.Sounds.Countdown:Play() mob.ArrowSpawn("Arrow", 4, 0.05, 1, 1, map)
 	end
 
 	for wave=1, waves do
+		if not Match.IsCurrent(generation) then return end
 		info.Wave.Value = wave
 		info.Message.Value = ""
 
@@ -70,12 +73,14 @@ function round.StartGame()
 			round.GetHard(wave, map)
 		end
 
+		if not Match.IsCurrent(generation) then return end
 		repeat
-			task.wait(1 / workspace.Info.GameSpeed.Value)
+			if not Match.Wait(generation, 1) then return end
 		until #workspace.Mobs:GetChildren() == 0 or not info.GameRunning.Value or (m.Value <= 0 and s.Value <= 0)
 
 		if info.GameRunning.Value and wave == waves then
 			info.Message.Value = "VICTORY"
+			info.GameRunning.Value = false
 
 			local BadgeService = game:GetService("BadgeService")
 			local Players = game:GetService("Players")
@@ -182,7 +187,7 @@ function round.StartGame()
 			events.SkipWaveHide:FireAllClients()
 			if reward > 0 then
 				info.Message.Value = "Wave Reward: $" .. reward
-				task.wait(2 / workspace.Info.GameSpeed.Value)
+				if not Match.Wait(generation, 2) then return end
 			else
 				info.Message.Value = ""
 			end
@@ -198,7 +203,7 @@ function round.StartGame()
 					else
 						info.Timer.Value = "00:" .. i
 					end
-					wait(1 / workspace.Info.GameSpeed.Value)
+					if not Match.Wait(generation, 1) then return end
 					info.Message.Value = ""
 					-- (you should play countdown sound via remote, but leaving your logic as-is)
 					game.StarterGui.GameGui.Sounds.Countdown:Play()

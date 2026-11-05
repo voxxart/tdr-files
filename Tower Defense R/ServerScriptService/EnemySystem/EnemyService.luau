@@ -27,6 +27,7 @@ local EnemyDamage = require(script.Parent:WaitForChild("EnemyDamage"))
 
 local TowerDeath = require(game.ServerScriptService.Main:WaitForChild("TowerDeath"))
 
+local Match = require(game.ServerScriptService.Simulation.MatchService)
 local EnemyService = {}
 
 local Settings = EnemyData.Settings
@@ -636,6 +637,10 @@ function EnemyService.Explode(runtimeOrModel, radius)
 end
 
 local function registerEnemy(model, map, pathData, options)
+	if not Match.IsCurrent(Match.Capture()) then
+		model:Destroy()
+		return nil
+	end
 	options = options or {}
 
 	local scaled = calculateBaseStats(
@@ -729,6 +734,7 @@ local function registerEnemy(model, map, pathData, options)
 		}
 	)
 
+	runtime.MatchGeneration = Match.Capture()
 	maxHealthValue.Value = runtime.MaxHealth
 	healthValue.Value = runtime.Health
 	speedValue.Value = runtime.Speed
@@ -777,6 +783,8 @@ local function registerEnemy(model, map, pathData, options)
 end
 
 function EnemyService.Spawn(name, quantity, cooldown, healthMultiplier, speedMultiplier, map)
+	local generation = Match.Capture()
+	if not Match.IsCurrent(generation) then return end
 	local template = ReplicatedStorage.Mobs:FindFirstChild(name)
 
 	if not template then
@@ -792,9 +800,9 @@ function EnemyService.Spawn(name, quantity, cooldown, healthMultiplier, speedMul
 		or math.round(Info.EnemyMultiplier.Value)
 
 	for _ = 1, quantity * multiplier do
-		task.wait((cooldown or 0) / getGameSpeed())
+		if not Match.Wait(generation, cooldown or 0) then return end
 
-		if Info.Message.Value == "GAME OVER" then
+		if not Match.IsCurrent(generation) then
 			return
 		end
 
@@ -822,6 +830,8 @@ function EnemyService.Spawn(name, quantity, cooldown, healthMultiplier, speedMul
 end
 
 function EnemyService.ArrowSpawn(name, quantity, cooldown, healthMultiplier, speedMultiplier, map)
+	local generation = Match.Capture()
+	if not Match.IsCurrent(generation) then return end
 	local template = ReplicatedStorage.Mobs:FindFirstChild(name)
 
 	if not template then
@@ -830,7 +840,7 @@ function EnemyService.ArrowSpawn(name, quantity, cooldown, healthMultiplier, spe
 	end
 
 	for _ = 1, quantity do
-		task.wait((cooldown or 0) / getGameSpeed())
+		if not Match.Wait(generation, cooldown or 0) then return end
 
 		local pathData = EnemyPaths.GetRandomPath(map)
 		if not pathData then return end
@@ -901,8 +911,12 @@ function EnemyService.Summon(
 	hostCFrame,
 	path,
 	pathLength,
-	positions
+	positions,
+	canContinue
 )
+	local generation = Match.Capture()
+	if not Match.IsCurrent(generation) or (canContinue and not canContinue()) then return end
+
 	local template = ReplicatedStorage.Mobs:FindFirstChild(name)
 
 	if not template then
@@ -1025,12 +1039,10 @@ function EnemyService.Summon(
 
 	for index = 1, quantity do
 		if index > 1 and perUnitDelay > 0 then
-			task.wait(
-				perUnitDelay / getGameSpeed()
-			)
+			if not Match.Wait(generation, perUnitDelay) then return end
 		end
 
-		if Info.Message.Value == "GAME OVER" then
+		if not Match.IsCurrent(generation) or (canContinue and not canContinue()) then
 			return
 		end
 
@@ -1233,6 +1245,11 @@ function EnemyService.Start()
 			local runtime = active[i]
 
 			if runtime.Dead or runtime.Cleaned then
+				continue
+			end
+
+			if not Match.IsCurrent(runtime.MatchGeneration) then
+				EnemyService.Destroy(runtime, "MatchEnded")
 				continue
 			end
 

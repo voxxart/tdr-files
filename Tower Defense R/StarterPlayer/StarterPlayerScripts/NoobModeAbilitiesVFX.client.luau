@@ -119,8 +119,7 @@ NoobicusAirstrike.OnClientEvent:Connect(function(enemy, target)
 			Explode(targetCFrame, 8.5)
 		end)
 		
-		local AirStrikeServer = NoobicusEvents:WaitForChild("AirStrike"):WaitForChild("AirStrikeServer")
-		AirStrikeServer:FireServer(enemy, target)
+		-- Airstrike damage is owned by EnemyAttacks/Noobicus on the server.
 
 
 		-- Shrink to invisible (continues smoothly)
@@ -131,7 +130,7 @@ NoobicusAirstrike.OnClientEvent:Connect(function(enemy, target)
 
 		task.wait(0.25)
 
-		-- Fire to server when strike hits
+		-- Release the local strike visual.
 		field:Destroy()
 	end)
 

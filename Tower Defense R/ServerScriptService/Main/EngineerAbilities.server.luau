@@ -1,6 +1,5 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local BuildServer = ReplicatedStorage.Events.NoobEngineerEvents.Build.BuildServer
-local ENEMY_MOD = require(game.ServerScriptService.Main.Mob)
 
 -- Known animation length BEFORE speed adjustment
 local BASE_BUILD_ANIM_LENGTH = 1.25
