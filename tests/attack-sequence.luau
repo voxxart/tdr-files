@@ -30,3 +30,24 @@ assert(ok and not result and damage == 0, 'Lost target must prevent damage')
 ok = run(false, true, true)
 assert(not ok, 'Errors must propagate after cleanup')
 print('Attack sequence checks passed: impact, cancellation, target loss, error cleanup')
+local impacts, released = 0, false
+local active = true
+local stage = 0
+Sequence.Run({
+	Active = function() return active end,
+	Start = function() end,
+	ValidTarget = function() return true end,
+	Windup = 1, Recovery = 0.67,
+	Wait = function(seconds)
+		stage += 1
+		if stage == 1 then assert(seconds == 1) else
+			assert(seconds == 0.67)
+			active = false
+		end
+		return active
+	end,
+	Impact = function() impacts += 1 end,
+	Cleanup = function() released = true end,
+})
+assert(impacts == 1 and released, 'Recovery cancellation must clean up without repeating/undoing impact')
+print('Delayed impact and recovery cancellation checks passed')

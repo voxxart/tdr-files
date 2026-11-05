@@ -4,7 +4,7 @@ local Match = require(game.ServerScriptService.Simulation.MatchService)
 local TowerDeath = require(game.ServerScriptService.Main.TowerDeath)
 local Towers = workspace:WaitForChild('Towers')
 local Damage = {}
-function Damage.Apply(target, amount, generation)
+function Damage.Apply(target, amount, generation, deathDelay)
 	if not Match.IsCurrent(generation) or target.Parent ~= Towers then return end
 	local config = target:FindFirstChild('Config')
 	local folder = config and config:FindFirstChild('Health')
@@ -17,7 +17,7 @@ function Damage.Apply(target, amount, generation)
 	local owner = config:FindFirstChild('Owner')
 	local player = owner and Players:FindFirstChild(owner.Value)
 	task.spawn(function()
-		if Match.Wait(generation, 0.5) and target.Parent == Towers then
+		if Match.Wait(generation, deathDelay or 0.5) and target.Parent == Towers then
 			TowerDeath.KillTower(target, player, function() return Match.IsCurrent(generation) end)
 		end
 	end)
