@@ -68,7 +68,8 @@ end
 --------------------------------------------------------
 -- KILL SINGLE TOWER
 --------------------------------------------------------
-function Tower.KillTower(newTower, ownerPlayer)
+function Tower.KillTower(newTower, ownerPlayer, canContinue)
+	if canContinue and not canContinue() then return end
 	if not newTower or not newTower:FindFirstChild("Config") then return end
 
 	disableTower(newTower)
@@ -81,7 +82,12 @@ function Tower.KillTower(newTower, ownerPlayer)
 		Events.OwnerRingAlter:FireClient(resolvedPlayer, newTower)
 	end
 
-	task.wait(2 / GameSpeedValue.Value)
+	if canContinue then
+		local Match = require(game.ServerScriptService.Simulation.MatchService)
+		if not Match.Wait(Match.Capture(), 2, canContinue) then return end
+	else
+		task.wait(2 / GameSpeedValue.Value)
+	end
 
 	if not newTower or not newTower.Parent then return end
 

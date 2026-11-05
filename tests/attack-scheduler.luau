@@ -70,3 +70,34 @@ queued[1](); table.clear(queued)
 assert(casts == 3)
 scheduler:Remove(entity)
 print('Spawner initial stagger and live cooldown checks passed')
+
+local finished = false
+scheduler:Add(entity, clock.Generation, {
+	InitialCooldown = function() return 0 end,
+	Cooldown = function() return 10 end,
+	CooldownAfterRun = true,
+	Run = function() clock:Advance(4, 1); finished = true; return true end,
+})
+scheduler:Step()
+queued[1](); table.clear(queued)
+assert(finished)
+clock:Advance(9, 1); scheduler:Step()
+assert(#queued == 0, 'Completion cooldown must exclude attack duration')
+clock:Advance(1, 1); scheduler:Step()
+assert(#queued == 1)
+scheduler:Remove(entity)
+queued[1](); table.clear(queued)
+print('Attack completion cooldown checks passed')
+local drops = 0
+scheduler:Add(entity, clock.Generation, {
+	Cooldown = function() return 0 end,
+	Finished = function() return drops >= 2 end,
+	Run = function() drops += 1 end,
+})
+for _ = 1, 4 do
+	scheduler:Step()
+	for _, callback in queued do callback() end
+	table.clear(queued)
+end
+assert(drops == 2 and next(scheduler._entries) == nil, 'Finite behaviors must release scheduler entries')
+print('Finite attack checks passed')

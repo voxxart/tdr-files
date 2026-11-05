@@ -28,13 +28,12 @@ function MatchService.Now()
 	return clock.Time
 end
 
-function MatchService.Wait(generation, seconds)
+function MatchService.Wait(generation, seconds, canContinue)
 	local deadline = clock.Time + math.max(seconds or 0, 0)
-	while MatchService.IsCurrent(generation) and clock.Time < deadline do
+	while MatchService.IsCurrent(generation) and (not canContinue or canContinue()) and clock.Time < deadline do
 		RunService.Heartbeat:Wait()
 	end
-	return clock:IsCurrent(generation) and Running.Value
-		and Message.Value ~= 'GAME OVER' and Message.Value ~= 'VICTORY'
+	return MatchService.IsCurrent(generation) and (not canContinue or canContinue())
 end
 
 function MatchService.After(generation, seconds, callback)

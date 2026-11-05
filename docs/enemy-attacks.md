@@ -73,3 +73,42 @@ because the shared behavior gained optional presentation settings. Scheduler tes
 cover first-cast delay and live cooldown reads; actual summons/visuals still require
 Studio validation. This migration does not yet change MEU.Server health reduction
 or the remaining client/server ability flows.
+
+## Marksman migration
+
+Marksman now uses Behaviors/Marksman, Targeting/NearestTower and the engine-independent
+Simulation/AttackSequence. Its adapter replaces its standalone Heartbeat and ancestry
+connections. Initial delay remains 5–8 game seconds. Targeting retains strict planar
+distance <25 studs and excludes Flying flags; dead/Dying towers are now excluded too.
+Damage is rounded 40% max tower health, or 50% with Death Wish, captured at attack start.
+Windup is 2 game seconds and recovery 2; cooldown starts after completion (22–23).
+Existing Fire animation, facing, Attack sound, Arrow remote and weapon hiding remain.
+
+MatchService.Wait now optionally accepts a cancellation predicate. Death/tag removal
+interrupt the sequence, while scheduler removal immediately releases movement/arrow
+ownership even during a pause. Cleanup is idempotent. Target loss before impact applies
+no damage and retries instead of permanently locking the attacker at infinite cooldown.
+Movement restores OrigSpeed only if its speed is still zero, preserving another writer's
+nonzero change. Overlapping zero-speed ownership from unrelated legacy systems remains
+a limitation until movement modifiers are centralized.
+
+A lethal committed hit starts match-scoped tower cleanup: the existing 0.5-second
+presentation delay and 2-second TowerDeath delay are retained and adapt to speed.
+TowerDeath.KillTower's optional cancellation predicate preserves other callers' behavior.
+A caster dying after damage does not undo a committed kill; match end stops its delayed
+cleanup. Facing currently uses the existing fixed-duration client protocol; matching
+mid-animation speed changes perfectly requires the later presentation migration.
+
+Studio update set: replace EnemyAttacks/Marksman, Simulation/AttackScheduler,
+Simulation/MatchService and Main/TowerDeath. Add ModuleScripts Behaviors/Marksman,
+Targeting/NearestTower (under a new Targeting Folder in EnemyAttacks), and
+Simulation/AttackSequence. Keep existing summoner modules/adapters.
+
+Verify nearest ground-tower selection, no flying/dead targeting, first delay, damage
+with/without Death Wish, animation/sound/projectile and lethal tower removal. Kill or
+untag Marksman during windup, sell its target, pause/resume, change timescale, and end
+or restart the match during windup/recovery/death cleanup. No cancelled windup should
+hit; a lost target should not permanently stop future attacks. Recheck all three
+summoners because scheduler/Wait are shared. Cloud sequence tests cover cancellation,
+target loss, exactly one impact, error cleanup and completion-based cooldowns; Roblox
+behavior remains pending Studio validation. No stress-test performance claim is made.

@@ -11,6 +11,7 @@ function Scheduler:Remove(entity)
 	if entry then
 		entry.Cancelled = true
 		self._entries[entity] = nil
+		if entry.Behavior.Cancel then entry.Behavior.Cancel() end
 	end
 end
 
@@ -31,7 +32,7 @@ function Scheduler:Step()
 	local now = context.Now()
 	for entity, entry in pairs(self._entries) do
 		local active = entry.Active
-		if not active() then
+		if not active() or (entry.Behavior.Finished and entry.Behavior.Finished()) then
 			self:Remove(entity)
 		elseif not entry.Busy and now >= entry.Next then
 			entry.Busy = true
@@ -39,8 +40,11 @@ function Scheduler:Step()
 			context.Dispatch(function()
 				-- Dispatch can be deferred; revalidate immediately before execution.
 				if active() then
-					local ok, err = pcall(entry.Behavior.Run, active)
-					if not ok then context.Report(err) end
+					local ok, result = pcall(entry.Behavior.Run, active)
+					if entry.Behavior.CooldownAfterRun and active() then
+						entry.Next = context.Now() + (if ok and result == false then 0 else entry.Behavior.Cooldown())
+					end
+					if not ok then context.Report(result) end
 				end
 				entry.Busy = false
 			end)
