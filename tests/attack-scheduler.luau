@@ -101,3 +101,16 @@ for _ = 1, 4 do
 end
 assert(drops == 2 and next(scheduler._entries) == nil, 'Finite behaviors must release scheduler entries')
 print('Finite attack checks passed')
+local attached, detached = 0, 0
+local owned = {
+	Cooldown = function() return 5 end,
+	Run = function() end,
+	Attach = function() attached += 1 end,
+	Cancel = function() detached += 1 end,
+}
+scheduler:Add(entity, clock.Generation, owned)
+scheduler:Add(entity, clock.Generation, owned)
+assert(attached == 1, 'Duplicate registration must not attach duplicate reward listeners')
+scheduler:Remove(entity); scheduler:Remove(entity)
+assert(detached == 1, 'Attached resources must be released once')
+print('Behavior resource ownership checks passed')

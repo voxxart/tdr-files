@@ -37,7 +37,7 @@ function Attack.new(enemy, definition)
 				local fraction = if workspace.Info.Modifiers['Death Wish'].Value then definition.DeathWishDamage else definition.Damage
 				local health = target.Config.Health
 				local amount = Amount.Percent(health.HealthValue.Value, health.MaxHealth.Value, fraction, definition.RoundRemaining)
-				Damage.Apply(target, amount, generation, definition.DeathDelay)
+				Damage.Apply(target, if definition.Lethal then health.HealthValue.Value else amount, generation, definition.DeathDelay)
 				if definition.Hold then
 					if speed then speed.Value = 0 end
 					Mob.FacePart(enemy, target.PrimaryPart, definition.Hold / math.max(workspace.Info.GameSpeed.Value, 0.0001))

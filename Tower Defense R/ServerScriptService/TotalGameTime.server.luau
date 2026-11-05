@@ -1,24 +1,20 @@
-local info = workspace.Info
-local totalTimeStats = info.TotalGameTime
-local message = info.Message
-local wave = info.Wave
-
--- Wait for wave 1 to start
-while wave.Value ~= 1 do
-	wait(1)
-end
-
--- Start timer
-while true do
-	wait(1)
-	totalTimeStats.Seconds.Value += 1
-
-	if totalTimeStats.Seconds.Value >= 60 then
-		totalTimeStats.Seconds.Value = 0
-		totalTimeStats.Minutes.Value += 1
+local RunService = game:GetService('RunService')
+local Match = require(game.ServerScriptService.Simulation.MatchService)
+local info = workspace:WaitForChild('Info')
+local generation, elapsed = nil, 0
+RunService.Heartbeat:Connect(function(dt)
+	local current = Match.Capture()
+	if current ~= generation then
+		generation, elapsed = current, 0
+		info.TotalGameTime.Seconds.Value = 0
+		info.TotalGameTime.Minutes.Value = 0
 	end
-
-	if message.Value == "GAME OVER" or message.Value == "VICTORY" then
-		break
-	end
-end
+	if not Match.IsCurrent(current) or info.Wave.Value < 1 then return end
+	-- Preserve actual elapsed match time, independent of simulation speed.
+	elapsed += dt
+	if elapsed < 1 then return end
+	local seconds = math.floor(elapsed); elapsed -= seconds
+	local total = info.TotalGameTime.Minutes.Value * 60 + info.TotalGameTime.Seconds.Value + seconds
+	info.TotalGameTime.Minutes.Value = math.floor(total / 60)
+	info.TotalGameTime.Seconds.Value = total % 60
+end)

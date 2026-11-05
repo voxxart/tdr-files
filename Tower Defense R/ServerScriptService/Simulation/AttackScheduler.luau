@@ -25,6 +25,10 @@ function Scheduler:Add(entity, generation, behavior)
 		return not entry.Cancelled and self._entries[entity] == entry
 			and self._context.IsCurrent(entry.Generation) and self._context.Alive(entity)
 	end
+	if behavior.Attach then
+		local ok, err = pcall(behavior.Attach)
+		if not ok then self:Remove(entity); self._context.Report(err) end
+	end
 end
 
 function Scheduler:Step()
