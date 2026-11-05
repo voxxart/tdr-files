@@ -46,3 +46,27 @@ queued[1](); table.clear(queued)
 scheduler:Step()
 assert(runs == 1 and next(scheduler._entries) == nil, 'Restart must invalidate pending attacks')
 print('Attack scheduler checks passed: cooldown, pause, speed, overlap, removal, death, restart')
+
+-- Spawner has a distinct first delay and reads its cooldown at each cast.
+local liveCooldown = 5
+local casts = 0
+local current = clock.Generation
+scheduler:Add(entity, current, {
+	InitialCooldown = function() return 0.5 end,
+	Cooldown = function() return liveCooldown end,
+	Run = function() casts += 1 end,
+})
+clock:Advance(0.49, 1); scheduler:Step()
+assert(#queued == 0)
+clock:Advance(0.02, 1); scheduler:Step()
+assert(#queued == 1, 'First cast should use initial stagger')
+queued[1](); table.clear(queued)
+liveCooldown = 2
+clock:Advance(5, 1); scheduler:Step()
+queued[1](); table.clear(queued)
+clock:Advance(2, 1); scheduler:Step()
+assert(#queued == 1, 'Subsequent casts must read live cooldown')
+queued[1](); table.clear(queued)
+assert(casts == 3)
+scheduler:Remove(entity)
+print('Spawner initial stagger and live cooldown checks passed')

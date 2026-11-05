@@ -11,6 +11,7 @@ local definition = {
 	SpeedMultiplier = 1,
 	Sound = 'Death',
 	Animation = 'Summon',
+	ClientEffect = game:GetService('ReplicatedStorage').Events.MEU.Client,
 }
 local function start(enemy)
 	Attacks.Add(enemy, Summon.new(enemy, definition))

@@ -18,7 +18,7 @@ function Scheduler:Add(entity, generation, behavior)
 	if self._entries[entity] then return end
 	if not self._context.IsCurrent(generation) then return end
 	local entry = {Generation = generation, Cancelled = false, Busy = false, Behavior = behavior}
-	entry.Next = self._context.Now() + behavior.Cooldown()
+	entry.Next = self._context.Now() + (behavior.InitialCooldown or behavior.Cooldown)()
 	self._entries[entity] = entry
 	entry.Active = function()
 		return not entry.Cancelled and self._entries[entity] == entry

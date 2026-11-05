@@ -41,8 +41,6 @@ SummonEnemyEvent.Event:Connect(function(Enemy)
 		enemy.Summon("Marksman", math.random(7,8), 0.5, 0.65 ,1.5, map, Enemy.Alpha.Value, Enemy.Hitbox.CFrame, path, pathLength, positions)
 	elseif Enemy.Name == "Noob Engineer" then
 		enemy.Summon("Spawner", 1, 0.1, 1 ,1, map, Enemy.Alpha.Value, Enemy.Hitbox.CFrame, path, pathLength, positions)
-	elseif Enemy.Name == "Spawner" then
-		enemy.Summon("Spawned Armored Noob", 3, 0.28, 2 ,1, map, Enemy.Alpha.Value, Enemy.Hitbox.CFrame, path, pathLength, positions)
 	elseif Enemy.name == "Rift" then
 		enemy.Summon("Voidling", 69, 0.05, 1 ,0.2, map, Enemy.Alpha.Value, Enemy.Hitbox.CFrame, path, pathLength, positions)
 	end

@@ -37,3 +37,39 @@ spawn and confirm remaining children are cancelled. End/restart mid-cast, change
 game speed mid-cooldown, pause and resume, and check no stale cast fires. Verify
 other attacks continue unchanged. Scale-test with production assets before claiming
 any performance target.
+
+## MEU and Spawner follow-up
+
+MEU and Spawner now register with the same AttackService. Their individual
+Heartbeats and per-entity ancestry connections are removed.
+
+- MEU: 8–9 game-second cooldown (SummonMin/Max overrides retained), three Summoned
+  Armored Zombies, 1.18x health, 1x speed, Summon sound and MEU.Client effects.
+  No extra AnimateEnemy event is introduced.
+- Spawner: original math.random() initial stagger, then live EnemyStats.Cooldown
+  in game seconds; three Spawned Armored Noobs, 2x health, 1x speed. No additional
+  animation, sound or client effect is introduced. The initial stagger now follows
+  simulation time, including pause, consistent with subsequent cooldowns.
+- Summon now accepts optional animation, sound, client effect, first-cast delay
+  and cooldown provider settings. Necromancer explicitly selects its existing
+  MEU.Client effect, preserving its Studio-verified presentation.
+- The Spawner branch in Summon.server is removed because the behavior calls
+  Mob.Summon directly with a cancellation predicate. Keep SummonEnemy and the
+  other branches: existing enemies still use that event.
+- AttackService warns for missing runtimes or inactive/missing generations,
+  instead of silently failing. It briefly waits for delayed runtime registration
+  and ignores tagged templates outside workspace.
+
+Studio update set (existing lifecycle modules and updated EnemyService required):
+replace EnemyAttacks/MEU, Spawner, Necromancer, AttackService, Behaviors/Summon,
+Simulation/AttackScheduler, and ServerScriptService/Summon. Keep one copy of each.
+No new modules or events are introduced in this follow-up.
+
+Test MEU for three children, correct health/speed and original effects. Test Spawner
+for its short first stagger, three children and model-authored subsequent cooldown.
+Kill/remove the caster tag during each group and end/restart the match; remaining
+summons must stop. Change speed mid-cooldown and pause/resume. Recheck Necromancer
+because the shared behavior gained optional presentation settings. Scheduler tests
+cover first-cast delay and live cooldown reads; actual summons/visuals still require
+Studio validation. This migration does not yet change MEU.Server health reduction
+or the remaining client/server ability flows.

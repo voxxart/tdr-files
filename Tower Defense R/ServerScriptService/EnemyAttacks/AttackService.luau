@@ -19,13 +19,40 @@ local scheduler = Scheduler.new({
 })
 
 -- All migrated attacks share this single connection.
-RunService.Heartbeat:Connect(function() scheduler:Step() end)
 local AttackService = {}
+local pending = {}
 function AttackService.Add(enemy, behavior)
 	local runtime = Runtime.Get(enemy)
-	if runtime then scheduler:Add(enemy, runtime.MatchGeneration, behavior) end
+	if not enemy:IsDescendantOf(workspace) then return end
+	if not runtime then
+		-- Tag signals can arrive before a custom spawner finishes registration.
+		pending[enemy] = {Behavior = behavior, Deadline = os.clock() + 2}
+		return
+	end
+	if not Match.IsCurrent(runtime.MatchGeneration) then
+		warn('Enemy attack not registered: inactive or missing MatchGeneration for', enemy:GetFullName(),
+			'Check that EnemyService and Main.Round are both updated.')
+		return
+	end
+	scheduler:Add(enemy, runtime.MatchGeneration, behavior)
 end
 function AttackService.Remove(enemy)
+	pending[enemy] = nil
 	scheduler:Remove(enemy)
 end
+RunService.Heartbeat:Connect(function()
+	for enemy, request in pairs(pending) do
+		if not enemy:IsDescendantOf(workspace) then
+			pending[enemy] = nil
+		elseif Runtime.Get(enemy) then
+			pending[enemy] = nil
+			AttackService.Add(enemy, request.Behavior)
+		elseif os.clock() >= request.Deadline then
+			pending[enemy] = nil
+			warn('Enemy attack not registered: no EnemyRuntime for', enemy:GetFullName(),
+				'Confirm this enemy was spawned by the updated EnemyService.')
+		end
+	end
+	scheduler:Step()
+end)
 return AttackService
