@@ -11,6 +11,17 @@ function Scheduler:Step()
 	local now, wall = Match.Now(), os.clock()
 	for model, data in pairs(towers) do
 		local config = data.config
+		if model.Parent and config and config.Parent and data.PendingMatch then
+			local generation = Match.Capture()
+			if Match.IsCurrent(generation) then
+				data.MatchGeneration = generation
+				data.PendingMatch = false
+				data.nextAttack, data.nextSecondary, data.lastAttack = 0, 0, 0
+			else
+				-- Keep pregame placements registered without executing combat.
+				continue
+			end
+		end
 		if not model.Parent or not config or not config.Parent or not Match.IsCurrent(data.MatchGeneration) then
 			data.burstGen = (data.burstGen or 0) + 1
 			context.Projectiles.Cancel(model)

@@ -5257,6 +5257,8 @@ function tower.StartAttackLoop(newTower, player, carryOver)
 		player       = player,
 		config       = config,
 		MatchGeneration = Match.Capture(),
+		-- Generation zero is preparation for the first match, not an ended match.
+		PendingMatch = Match.Capture() == 0 and not Match.IsCurrent(Match.Capture()),
 		lastAttack   = (carryOver and carryOver.lastAttack) or 0,
 		isBursting   = false,
 		burstGen     = 0,

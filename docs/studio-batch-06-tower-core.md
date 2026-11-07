@@ -124,3 +124,13 @@ fixture executes actual primary/secondary/burst/scheduler/projectile modules wit
 simulated dependencies to check damage/cash/shields, overlap, pause, cancellation
 and bounded projectile cleanup. It does not simulate Roblox physics, replication,
 models, animation or UI, and Studio parity validation remains required.
+
+## Pregame placement correction
+
+Towers placed during preparation (generation zero) now stay registered without
+executing combat. When the first match begins they bind once to its generation.
+Ended-match towers still deregister and cannot attach to a later match. Update
+Main.TowerServer and TowerSystem.CombatScheduler for this correction. Integration
+checks cover preparation, enrollment, match end and prevention of later re-enrollment.
+Fresh placement also initializes HealthValue from module MaxHealth rather than
+copying a potentially zero template health value.

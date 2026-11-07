@@ -28,12 +28,12 @@ local function node(fields)
     function fields:GetAttribute() return nil end
     return fields
 end
-local now, valid = 0, true
+local now, valid, matchGeneration = 0, true, 1
 local queued, delayed, cleanup = {}, {}, {}
 local Match = {
     Now = function() return now end,
-    Capture = function() return 1 end,
-    IsCurrent = function(g) return valid and g == 1 end,
+    Capture = function() return matchGeneration end,
+    IsCurrent = function(g) return valid and g == matchGeneration end,
     Wait = function(_, _, active) return valid and (not active or active()) end,
     After = function(_, seconds, callback)
         local record = {Seconds=seconds,Callback=callback}
@@ -148,6 +148,21 @@ launch(); delayed[3].Callback()
 assert(impacts==1 and next(runtime.State.Projectiles)==nil)
 launch(); cleanup[1]()
 assert(delayed[4].Cancelled)
+-- A tower placed before the first match must wait, then enroll once.
+valid=false; matchGeneration=0
+local prepared={config=config,MatchGeneration=0,PendingMatch=true}
+towers[model]=prepared
+scheduler:Step()
+assert(towers[model]==prepared and #queued==0, 'Preparation must retain the tower without firing')
+valid=true; matchGeneration=1; now=0
+scheduler:Step()
+assert(prepared.MatchGeneration==1 and not prepared.PendingMatch and #queued==1)
+queued[1](); table.clear(queued)
+valid=false; scheduler:Step()
+assert(towers[model]==nil, 'Ended-match towers must be deregistered')
+valid=true; matchGeneration=2; scheduler:Step()
+assert(towers[model]==nil and #queued==0, 'Old towers must not enroll into a later match')
+print('Pregame placement checks passed: retained, enrolled once, invalidated on end')
 print('Tower integration checks passed: primary damage/cash/shields, scheduling, pause, match end, projectile ownership')
 '''
 with tempfile.TemporaryDirectory() as directory:
