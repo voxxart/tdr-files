@@ -10,26 +10,28 @@ local function create(class,parent,properties)
 	return object
 end
 
+-- Match internal spacing to the revised 0.108 resting height (previously 0.095).
 local function defaultTemplate(host)
+	local function fit(pixels) return math.round(pixels*0.108/0.095) end
 	local frame=create('Frame',nil,{Name='AdvancedStatsTemplate',Visible=false,Size=UDim2.new(0.975,0,0.108,0),
 		BackgroundColor3=Color3.fromRGB(25,31,43),BorderSizePixel=0,ClipsDescendants=true,Active=true})
-	create('UICorner',frame,{CornerRadius=UDim.new(0,8)})
+	create('UICorner',frame,{CornerRadius=UDim.new(0,fit(8))})
 	create('UIStroke',frame,{Color=Color3.fromRGB(100,122,155),Transparency=0.65,Thickness=1})
 	local header=create('TextButton',frame,{Name='Toggle',Size=UDim2.new(1,0,1,0),
 		BackgroundTransparency=1,Text='',AutoButtonColor=false,Selectable=true})
-	create('TextLabel',header,{Name='Title',Position=UDim2.fromOffset(14,0),Size=UDim2.new(1,-58,1,0),
-		BackgroundTransparency=1,Text='Advanced Stats',Font=Enum.Font.GothamBold,TextSize=17,
+	create('TextLabel',header,{Name='Title',Position=UDim2.fromOffset(fit(14),0),Size=UDim2.new(1,-fit(58),1,0),
+		BackgroundTransparency=1,Text='Advanced Stats',Font=Enum.Font.GothamBold,TextSize=fit(17),
 		TextColor3=Color3.fromRGB(245,247,255),TextXAlignment=Enum.TextXAlignment.Left,TextWrapped=true})
 	create('TextLabel',header,{Name='Arrow',AnchorPoint=Vector2.new(0.5,0.5),
-		Position=UDim2.new(1,-24,0.5,0),Size=UDim2.fromOffset(22,22),BackgroundTransparency=1,
-		Text='⌄',Font=Enum.Font.GothamBold,TextSize=22,TextColor3=Color3.fromRGB(225,235,255)})
-	local body=create('Frame',frame,{Name='Content',Position=UDim2.fromOffset(14,55),
-		Size=UDim2.new(1,-28,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1})
-	create('UIListLayout',body,{SortOrder=Enum.SortOrder.LayoutOrder,Padding=UDim.new(0,8)})
+		Position=UDim2.new(1,-fit(24),0.5,0),Size=UDim2.fromOffset(fit(22),fit(22)),BackgroundTransparency=1,
+		Text='⌄',Font=Enum.Font.GothamBold,TextSize=fit(22),TextColor3=Color3.fromRGB(225,235,255)})
+	local body=create('Frame',frame,{Name='Content',Position=UDim2.new(0.5,0,0.5,0),AnchorPoint=Vector2.new(0.5,0.5),
+		Size=UDim2.new(1,-fit(28),0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1})
+	create('UIListLayout',body,{SortOrder=Enum.SortOrder.LayoutOrder,Padding=UDim.new(0,fit(8))})
 	for index,name in ipairs(Data.LabelNames) do
-		create('TextLabel',body,{Name=name,LayoutOrder=index,Size=UDim2.new(1,0,0,20),Visible=false,
+		create('TextLabel',body,{Name=name,LayoutOrder=index,Size=UDim2.new(1,0,0,fit(20)),Visible=false,
 			AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,Text='',RichText=false,TextWrapped=true,
-			Font=Enum.Font.Gotham,TextSize=16,TextColor3=Color3.fromRGB(210,220,237),
+			Font=Enum.Font.Gotham,TextSize=fit(16),TextColor3=Color3.fromRGB(210,220,237),
 			TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Top})
 	end
 	frame.Parent=host
@@ -105,7 +107,7 @@ function UI:CreateRecord()
 		header.Size=UDim2.new(headerSize.X.Scale,headerSize.X.Offset,0,headerHeight)
 		body.Size=UDim2.new(bodySize.X.Scale,bodySize.X.Offset,0,contentHeight)
 		body.Position=UDim2.new(bodyPosition.X.Scale,bodyPosition.X.Offset,0,headerHeight+contentHeight*bodyAnchor.Y)
-		local extra=if record.Open then contentHeight+16 else 0
+		local extra=if record.Open then contentHeight+18 else 0
 		local target=UDim2.new(closedSize.X.Scale,closedSize.X.Offset,closedSize.Y.Scale,closedSize.Y.Offset+extra)
 		if animate==false then frame.Size=target; return end
 		record.Tween=TweenService:Create(frame,TweenInfo.new(0.25,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),{Size=target})

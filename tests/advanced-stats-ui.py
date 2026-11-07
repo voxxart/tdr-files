@@ -66,6 +66,10 @@ local chunk=assert(loadstring(source0)); setfenv(chunk,env); local UI=chunk()
 local host=node('ScrollingFrame'); host.Name='Main'; host.AutomaticCanvasSize=0
 local ui=UI.new(host)
 assert(ui.Template.Name=='AdvancedStatsTemplate' and not ui.Template.Visible)
+assert(ui.Template.Size.X.Scale==0.975 and ui.Template.Size.Y.Scale==0.108)
+assert(ui.Template.Toggle.Title.TextSize==19 and ui.Template.Toggle.Arrow.Size.X.Offset==25)
+assert(ui.Template.Content.Size.X.Offset==-32 and ui.Template.Content.One.TextSize==18)
+assert(ui.Template.Content:FindFirstChildOfClass('UIListLayout').Padding.Offset==9)
 local def={Upgrades={[1]={AdvancedStats1={Title='Abilities',One='First',Nine='Last'},AdvancedStats2={Title='Second',Two='Middle'}},[2]={}}}
 local identity={}
 ui:ShowLevel(def,1,identity)
@@ -73,15 +77,15 @@ assert(#ui.Records==2 and ui.Records[1].Frame.Visible)
 local record=ui.Records[1]
 assert(not record.Frame:FindFirstChildOfClass('UIStroke') and record.Header:FindFirstChildOfClass('UIStroke'),'outline must belong to fixed header')
 assert(record.Header.Title.Text=='Abilities' and record.Body.One.Visible and record.Body.Nine.Visible and not record.Body.Two.Visible)
-record.Header.Activated:Fire(); assert(record.Open and record.Tween.Goal.Size.Y.Scale==0.095 and record.Tween.Goal.Size.Y.Offset==116)
+record.Header.Activated:Fire(); assert(record.Open and record.Tween.Goal.Size.Y.Scale==0.108 and record.Tween.Goal.Size.Y.Offset==118)
 local headerHeight=record.Header.Size.Y.Offset
 record.Tween:Finish(); assert(record.Header.Size.Y.Offset==headerHeight,'opening must not stretch outlined header')
 local opening=record.Tween; record.Header.Activated:Fire()
-assert(not record.Open and opening.Cancelled and record.Tween.Goal.Size.Y.Scale==0.095 and record.Tween.Goal.Size.Y.Offset==0)
+assert(not record.Open and opening.Cancelled and record.Tween.Goal.Size.Y.Scale==0.108 and record.Tween.Goal.Size.Y.Offset==0)
 record.Header.Activated:Fire(); record.Tween:Finish()
 record.Body:FindFirstChildOfClass('UIListLayout').AbsoluteContentSize={Y=220}
 record.Body:FindFirstChildOfClass('UIListLayout'):GetPropertyChangedSignal('AbsoluteContentSize'):Fire()
-assert(record.Tween.Goal.Size.Y.Offset==236,'wrapping/content changes must resize open groups')
+assert(record.Tween.Goal.Size.Y.Offset==238,'wrapping/content changes must resize open groups')
 local count=objects; ui:ShowLevel(def,1,identity); assert(objects==count and record.Open,'same selection preserves open state')
 ui:ShowLevel(def,2,identity); assert(not record.Frame.Visible and not record.Open)
 ui:ShowLevel(def,1,{}); assert(objects==count and not record.Open,'records must be pooled')
@@ -102,10 +106,10 @@ local scaled=reused.Records[1]
 assert(scaled.Frame.Size.X.Scale==0.924 and scaled.Frame.Size.Y.Scale==0.095 and scaled.Frame.Size.Y.Offset==0 and scaled.Frame.Parent==host)
 assert(scaled.Header.Size.Y.Offset==95 and scaled.Body.AnchorPoint.Y==0.5)
 assert(scaled.Body.Position.X.Scale==0.5 and scaled.Body.Position.Y.Offset==145)
-scaled.Header.Activated:Fire(); assert(scaled.Tween.Goal.Size.Y.Scale==0.095 and scaled.Tween.Goal.Size.Y.Offset==116)
+scaled.Header.Activated:Fire(); assert(scaled.Tween.Goal.Size.Y.Scale==0.095 and scaled.Tween.Goal.Size.Y.Offset==118)
 assert(scaled.Header.Size.Y.Offset==95,'header must not expand over the content')
 host.AbsoluteCanvasSize={Y=800}; host:GetPropertyChangedSignal('AbsoluteCanvasSize'):Fire()
-assert(scaled.Header.Size.Y.Offset==76 and scaled.Frame.Size.Y.Scale==0.095 and scaled.Frame.Size.Y.Offset==116)
+assert(scaled.Header.Size.Y.Offset==76 and scaled.Frame.Size.Y.Scale==0.095 and scaled.Frame.Size.Y.Offset==118)
 assert(custom.Size.Y.Scale==0.095 and custom.Toggle.Size.Y.Scale==1 and custom.Content.Position.Y.Scale==0.5,'template must remain unchanged')
 reused:Destroy(); assert(not custom.Destroyed)
 -- Server stat merge must ignore level-local display tables.
