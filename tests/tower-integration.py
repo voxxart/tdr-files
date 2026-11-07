@@ -95,11 +95,15 @@ assert(#queued==1, 'Yielding primary work must not overlap')
 queued[1](); table.clear(queued)
 assert(attacks==1)
 now=0.5; scheduler:Step(); assert(#queued==0)
+config.Health=node({HealthValue={Value=0},MaxHealth={Value=100}})
+now=1; scheduler:Step(); assert(#queued==0, 'Zero-health templates must not attack until placement initializes health')
+config.Health.HealthValue.Value=config.Health.MaxHealth.Value
+
 now=1; workspace.Info.GameSpeed.Value=0; scheduler:Step(); assert(#queued==0)
 workspace.Info.GameSpeed.Value=1; scheduler:Step(); assert(#queued==1)
 queued[1](); table.clear(queued)
 valid=false; scheduler:Step()
-assert(towers[model]==nil and cancelled==1)
+assert(towers[model]==nil and cancelled==2)
 valid=true
 local position=setmetatable({}, {__sub=function() return {Magnitude=10} end})
 target.Hitbox={Position=position}

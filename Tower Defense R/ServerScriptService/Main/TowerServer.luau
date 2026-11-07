@@ -2031,6 +2031,10 @@ function tower.Spawn(
 		local baseStats = TowerStats.GetStatsForLevel(name, 0, cfg)
 		TowerStats.ApplyStatsToConfig(cfg, baseStats)
 
+		-- A placed tower is a new live entity, not the template's saved damage state.
+		-- Core combat rejects zero-health towers, so initialize both health mirrors.
+		applyTowerHealth(cfg, baseStats.MaxHealth, 0)
+
 		-- If this tower has a module-defined secondary attack at level 0,
 		-- mirror it into Config.Secondary so all the original attack code
 		-- continues to work unchanged.
