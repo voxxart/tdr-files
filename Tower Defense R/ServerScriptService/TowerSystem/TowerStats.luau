@@ -1,3 +1,4 @@
+local CombatProfiles = require(game.ReplicatedStorage.GameModules.CombatProfiles)
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local TowerData = require(ReplicatedStorage.GameModules:WaitForChild("TowerData"))
@@ -183,6 +184,7 @@ function TowerStats.GetStatsForLevel(name, level, fallbackConfig)
 		end
 	end
 
+	result.DamageType = CombatProfiles.Resolve(name, result.DamageType)
 	return result
 end
 

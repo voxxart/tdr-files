@@ -27,6 +27,13 @@ local TowerSystemFolder = game.ServerScriptService:WaitForChild("TowerSystem")
 local TowerStats = require(TowerSystemFolder:WaitForChild("TowerStats"))
 local TowerAppearance = require(TowerSystemFolder:WaitForChild("TowerAppearance"))
 local TowerRuntime = require(TowerSystemFolder:WaitForChild("TowerRuntime"))
+local Match = require(game.ServerScriptService.Simulation.MatchService)
+local Targeting = require(TowerSystemFolder:WaitForChild("Targeting"))
+local SecondaryAttack = require(TowerSystemFolder:WaitForChild("SecondaryAttack"))
+local BurstAttack = require(TowerSystemFolder:WaitForChild("BurstAttack"))
+local PrimaryAttack = require(TowerSystemFolder:WaitForChild("PrimaryAttack"))
+local CombatScheduler = require(TowerSystemFolder:WaitForChild("CombatScheduler"))
+local ProjectileService = require(TowerSystemFolder:WaitForChild("ProjectileService"))
 
 local task_spawn = task.spawn
 local task_defer = task.defer
@@ -3121,120 +3128,9 @@ end
 -- ============================================================
 function tower.FindTarget(newTower, range, mode)
 	if isCorruptedTower(newTower) then return nearestCorruptionTower(newTower, range) end
-	local hrp = newTower:FindFirstChild("HumanoidRootPart")
-	if not hrp then return nil end
-
-	local towerPos
-	if newTower.Config:FindFirstChild("Aviator") then
-		towerPos = newTower:FindFirstChild("UpgradeModels")["0"].Plane:FindFirstChild("RotatePart").RangeFollow.WorldPosition
-	else
-		towerPos = hrp.Position
-	end
-
-	local hx, hz = towerPos.X, towerPos.Z
-	local rangeSq = range * range
-
-	local prioritizeFlying = newTower.Config:FindFirstChild("Aviator") ~= nil
-
-	local bestTarget, bestDist, bestAlpha, bestHealth
-	local bestIsFlying = false
-
-	for mob in pairs(MobSet) do
-		local stats  = mob:FindFirstChild("EnemyStats")
-		local hitbox = mob:FindFirstChild("Hitbox")
-		local alpha  = mob:FindFirstChild("Alpha")
-		if not (stats and hitbox and alpha) then continue end
-
-		if stats:FindFirstChild("Hidden") and stats.Hidden.Value then
-			if not (newTower.Config:FindFirstChild("HiddenDetection") and newTower.Config.HiddenDetection.Value) then
-				continue
-			end
-		end
-
-		if stats:FindFirstChild("Flying") and stats.Flying.Value then
-			if not (newTower.Config:FindFirstChild("FlyingDetection") and newTower.Config.FlyingDetection.Value) then
-				continue
-			end
-		end
-
-		local hitboxPos = hitbox.Position
-		local dx = hitboxPos.X - hx
-		local dz = hitboxPos.Z - hz
-		local distSq = dx * dx + dz * dz
-
-		if distSq > rangeSq then
-			continue
-		end
-
-		local isFlying = stats:FindFirstChild("Flying") and stats.Flying.Value
-
-		if prioritizeFlying then
-			if isFlying and not bestIsFlying then
-				bestTarget = nil
-				bestDist = nil
-				bestAlpha = nil
-				bestHealth = nil
-				bestIsFlying = true
-			elseif not isFlying and bestIsFlying then
-				continue
-			end
-		end
-
-		if stats:FindFirstChild("Aggro") then
-			return mob
-		end
-
-		if newTower.Config:FindFirstChild("BeamerSettings") then
-			local maxHealth = stats:FindFirstChild("MaxHealth")
-
-			if maxHealth and maxHealth.Value < 500 then
-				continue
-			end
-		end
-
-		if mode == "Near" then
-			if not bestDist or distSq < bestDist then
-				bestDist = distSq
-				bestTarget = mob
-				bestIsFlying = isFlying
-			end
-
-		elseif mode == "First" then
-			local av = alpha.Value
-			if not bestAlpha or av > bestAlpha then
-				bestAlpha = av
-				bestTarget = mob
-				bestIsFlying = isFlying
-			end
-
-		elseif mode == "Last" then
-			local av = alpha.Value
-			if not bestAlpha or av < bestAlpha then
-				bestAlpha = av
-				bestTarget = mob
-				bestIsFlying = isFlying
-			end
-
-		elseif mode == "Strong" then
-			local hp = stats.Health.Value
-			if not bestHealth or hp > bestHealth then
-				bestHealth = hp
-				bestTarget = mob
-				bestIsFlying = isFlying
-			end
-
-		elseif mode == "Weak" then
-			local hp = stats.Health.Value
-			if not bestHealth or hp < bestHealth then
-				bestHealth = hp
-				bestTarget = mob
-				bestIsFlying = isFlying
-			end
-		end
-	end
-
-	return bestTarget
+	return Targeting.Find(newTower, range, mode)
 end
+
 -- ============================================================
 -- FACE TARGET
 -- ============================================================
@@ -3421,29 +3317,9 @@ end
 -- the shot effectively "misses" it.
 -- ============================================================
 function tower.FireSplashProjectile(newTower, target, config)
-	local hitbox = target and target:FindFirstChild("Hitbox")
-	if not hitbox then return end
-
-	local aimPos = hitbox.Position
-
-	-- ProjectileSpeed is now studs/second, not a flat duration.
-	-- Closer targets = shorter travelTime = faster impact.
-	local hrp = newTower:FindFirstChild("HumanoidRootPart")
-	local origin = (hrp and hrp.Position) or aimPos
-
-	local speedStudsPerSec = (config:FindFirstChild("ProjectileSpeed") and config.ProjectileSpeed.Value) or 50
-	local dist = (aimPos - origin).Magnitude
-
-	local MIN_TRAVEL_TIME = 0.05  -- avoid instant/zero-time edge cases at point blank
-	local travelTime = math_max(dist / speedStudsPerSec, MIN_TRAVEL_TIME) / getGameSpeed()
-
-	ReplicateEffectsEvent:FireAllClients(newTower, aimPos, "SplashProjectile", travelTime)
-
-	task_delay(travelTime, function()
-		if not (newTower and newTower.Parent and config and config.Parent) then return end
-		local mobSnapshot = MobsFolder:GetChildren()
-		tower.Splash(aimPos, newTower, mobSnapshot)
-	end)
+	ProjectileService.Launch(newTower, target, config,
+		function(...) ReplicateEffectsEvent:FireAllClients(...) end,
+		function(aim, model) tower.Splash(aim, model) end)
 end
 
 function tower.Aviator(newTower)
@@ -3707,175 +3583,12 @@ end
 -- ============================================================
 -- CORE ATTACK LOGIC
 -- ============================================================
-function tower.DoAttackLogic(newTower, player, config, targetOverride)
-	if not (newTower and newTower.Parent and config and config.Parent) then return end
-	if newTower:GetAttribute("ReaperSummoning") == true then return end
-	if isCorruptedTower(newTower) then
-		return corruptionPrimaryAttack(newTower, player, config)
-	end
-
-	local dealtDamage = false
-
-	local stunUntil = config:GetAttribute("StunnedUntil")
-	if stunUntil and os_clock() < stunUntil then return end
-
-	local targetMode = (config:FindFirstChild("TargetMode") and config.TargetMode.Value) or "First"
-	local range      = config:FindFirstChild("Range") and config.Range.Value
-	local target     = targetOverride or tower.FindTarget(newTower, range, targetMode)
-	if not target then return end
-
-	-- Remember this so DoSecondaryAttackLogic can shoot the same enemy
-	-- instead of finding its own.
-	local schedData = Towers[newTower]
-	if schedData then schedData.lastPrimaryTarget = target end
-
-	if not tower.Ammo(config, newTower) then return end
-
-	-- Legacy stun value gate
-	if config:FindFirstChild("Stunned") then return end
-
-	local enemyStats = target:FindFirstChild("EnemyStats")
-	if not enemyStats then return end
-
-	local dmg = config:FindFirstChild("Damage") and config.Damage.Value
-
-	-- Take a single mob snapshot for functions that iterate all mobs
-	local mobSnapshot = nil
-
-	if config:FindFirstChild("Splash") then
-		tower.FireSplashProjectile(newTower, target, config)
-	elseif config:FindFirstChild("Shocker") then
-		tower.Shocker(target, newTower, player)
-	else
-		if enemyStats:FindFirstChild("Invincible") then
-			local shield = target:FindFirstChild("Hitbox") and target.Hitbox:FindFirstChild("Shield")
-			if shield then shield.Attack:Play() end
-		elseif enemyStats:FindFirstChild("Lead") and not config:FindFirstChild("LeadDetection") then
-			local ls = enemyStats:FindFirstChild("LeadSound")
-			if ls then ls:Play() end
-		else
-			local defense = enemyStats:FindFirstChild("Defense")
-			local shield  = enemyStats:FindFirstChild("ShieldHealth")
-			local finalDamage = dmg
-
-			if config:FindFirstChild("BehemothStats") then
-				local bs  = config.BehemothStats
-				local dml = bs:FindFirstChild("DamageMultiplierLogic")
-				if dml then
-					local MinR = dml:FindFirstChild("MinRange")
-					local MidR = dml:FindFirstChild("MidRange")
-					local LngR = dml:FindFirstChild("LongRange")
-					if MinR and MidR and LngR then
-						local hitbox = target:FindFirstChild("Hitbox")
-						local hrp    = newTower:FindFirstChild("HumanoidRootPart")
-						if hitbox and hrp then
-							local dx   = hitbox.Position.X - hrp.Position.X
-							local dz   = hitbox.Position.Z - hrp.Position.Z
-							local dist = math_sqrt(dx*dx + dz*dz)
-							if dist <= MinR.Range.Value then
-								finalDamage = math_round(dmg * MinR.Multiplier.Value)
-							elseif dist <= MidR.Range.Value then
-								finalDamage = math_round(dmg * MidR.Multiplier.Value)
-							elseif dist <= LngR.Range.Value then
-								finalDamage = math_round(dmg * LngR.Multiplier.Value)
-							end
-						end
-					end
-				end
-			end
-
-			if defense and defense:FindFirstChild("DefenseValue") then
-				finalDamage = math_round(finalDamage / (1 + defense.DefenseValue.Value))
-			end
-
-			if shield and shield.Health.Value > 0 then
-				shield.Health.Value -= finalDamage
-				dealtDamage = false
-			else
-				enemyStats.Health.Value -= finalDamage
-				dealtDamage = true
-			end
-		end
-
-		if config:FindFirstChild("TotalDamage") then
-			config.TotalDamage.Value += dmg
-		end
-	end
-
-	-- Cash reward (uses cached player list)
-	do
-		local noCash = enemyStats:FindFirstChild("NoCash")
-		local inv    = enemyStats:FindFirstChild("Invincible")
-		local shield = enemyStats:FindFirstChild("ShieldHealth")
-		if dealtDamage and not noCash and not inv and not (shield and shield.Health.Value > 0) then
-			local halfCash = Info:FindFirstChild("Modifiers")
-				and Info.Modifiers:FindFirstChild("Half Cash")
-				and Info.Modifiers["Half Cash"].Value == true
-			for _, plr in ipairs(CachedPlayers) do
-				local c = plr:FindFirstChild("Cash")
-				if c then
-					local reward = math_max(1, math_round(dmg * 0.55))
-					if target:FindFirstChild("IsBoss") and halfCash then
-						c.Value += math_round(reward * 0.3)
-					elseif halfCash then
-						c.Value += math_round(reward * 0.32)
-					else
-						c.Value += reward
-					end
-				end
-			end
-		end
-	end
-
-	-- Burn / melt / FX
-	if config:FindFirstChild("BurnTime") then
-		if config:FindFirstChild("Flamethrower") then
-			ReplicateEffectsEvent:FireAllClients(newTower, target, "FireFlame")
-		end
-		mobSnapshot = mobSnapshot or MobsFolder:GetChildren()
-		tower.Flamethrower(newTower, mobSnapshot)
-
-		if config:FindFirstChild("DefenseMelt") and enemyStats:FindFirstChild("Defense") then
-			task_spawn(function() tower.DefenseMelt(newTower, target) end)
-		end
-		if not target:FindFirstChild("IsBoss") then tower.Slowdown(newTower, target) end
-
-		tower.Fire(newTower, target, config.BurnTime.Value, config.FireDamage.Value)
-		ReplicateEffectsEvent:FireAllClients(newTower, target, "Fire", config.BurnTime.Value)
-	end
-
-	if config:FindFirstChild("Flying") then
-		tower.HeliFaceTarget(newTower, target)
-	elseif config:FindFirstChild("Aviator") then
-	else
-		tower.FaceTarget(newTower, target, 0)
-	end
-	animateTowerEvent:FireAllClients(newTower, "Attack", target)
-
-	-- NOTE: target destruction is owned by mob.Move / mob.Explode on the server.
-	-- DoAttackLogic must NOT call target:Destroy() to avoid a race condition.
-
-	if config:FindFirstChild("Kills") then
-		config.Kills.Value += 1
-		if config:FindFirstChild("CashReward") then
-			tower.Cowboy(config, player, newTower)
-		end
-	end
-
-	if config:FindFirstChild("PelletCount") then
-		tower.FaceTargetInstant(newTower, target)
-		task.wait()
-		tower.Shotgunner(config, player, newTower)
-	end
-
-	if config:FindFirstChild("CurrentAmmo") then
-		config.CurrentAmmo.Value -= 1
-	end
-
-	if config:FindFirstChild("AOE") and config:FindFirstChild("MaxHits") then
-		tower.AOE(target, newTower, config.MaxHits.Value)
-	end
-end
+tower.DoAttackLogic = PrimaryAttack.new({
+	Tower = tower, Towers = Towers, IsCorrupted = isCorruptedTower,
+	CorruptionAttack = corruptionPrimaryAttack, Info = Info, MobsFolder = MobsFolder,
+	Effects = ReplicateEffectsEvent, Animate = animateTowerEvent,
+	GetPlayers = function() return CachedPlayers end,
+})
 
 -- ============================================================
 -- WAVE VALUE
@@ -5524,98 +5237,10 @@ function tower.SecondarySplash(targeted, obj)
 	end
 end
 
-function tower.DoSecondaryAttackLogic(newTower, player, config, secondary)
-	if not (newTower and secondary) then return end
-	if newTower:GetAttribute("ReaperSummoning") == true then return end
-	if isCorruptedTower(newTower) then
-		return corruptionSecondaryAttack(newTower, config, secondary)
-	end
-	local attackType = (secondary:FindFirstChild("Type") and secondary.Type.Value) or "Default"
-	local range      = secondary:FindFirstChild("Range") and secondary.Range.Value
-	local dmg        = secondary:FindFirstChild("Damage") and secondary.Damage.Value
-	local splash     = secondary:FindFirstChild("Splash") and secondary.Splash.Value
-
-	local stunUntil = config:GetAttribute("StunnedUntil")
-	if stunUntil and os_clock() < stunUntil then return end
-
-	-- Secondary should shoot whatever the primary is currently attacking,
-	-- not go find its own target. Falls back to an independent search
-	-- only if the primary has no valid target (e.g. hasn't fired yet, or
-	-- its target moved out of secondary's own range).
-	local schedData = Towers[newTower]
-	local primaryTarget = schedData and schedData.lastPrimaryTarget
-	local hrp = newTower:FindFirstChild("HumanoidRootPart")
-
-	local function isValidSecondaryTarget(t)
-		if not (t and t.Parent) then return false end
-		local stats = t:FindFirstChild("EnemyStats")
-		local hitbox = t:FindFirstChild("Hitbox")
-		if not (stats and hitbox) then return false end
-		if stats.Health.Value <= 0 then return false end
-		if range and hrp and (hitbox.Position - hrp.Position).Magnitude > range then return false end
-		return true
-	end
-
-	local target
-	if isValidSecondaryTarget(primaryTarget) then
-		target = primaryTarget
-	else
-		target = tower.FindTarget(newTower, range, "First")
-	end
-	if not target then return end
-
-	-- Legacy stun value gate
-	if config:FindFirstChild("Stunned") then return end
-
-
-	local head = newTower:FindFirstChild("Head") or newTower:FindFirstChild("HumanoidRootPart")
-
-	if attackType == "Rocket" then
-		if head and ParticleFolder:FindFirstChild("Rocket") then
-			local fx = ParticleFolder.Rocket:Clone(); fx.Parent = head
-			local s = fx:FindFirstChildWhichIsA("Sound", true); if s then pcall(s.Play, s) end
-			Debris:AddItem(fx, 2)
-		end
-		local hf = events:FindFirstChild("Helicopter")
-		local fr = hf and hf:FindFirstChild("FireRockets")
-		local AR = events.Aviator:FindFirstChild("FireRockets")
-		if fr and config:FindFirstChild("Flying") then fr:FireAllClients(newTower, target)
-		elseif AR and config:FindFirstChild("Aviator") then AR:FireAllClients(newTower, target)
-		elseif fr and config:FindFirstChild("WarMachine") then events.WarMachine.FireRockets:FireAllClients(newTower, target) end
-		if splash then tower.SecondarySplash(target, newTower)
-		else
-			local s = target:FindFirstChild("EnemyStats"); if s then s.Health.Value -= dmg end
-		end
-	elseif attackType == "Laser" then
-		if head and target:FindFirstChild("Hitbox") then
-			local p0 = head.Position; local p1 = target.Hitbox.Position; local dist = (p0-p1).Magnitude
-			local beam = Instance.new("Part"); beam.Anchored=true; beam.CanCollide=false; beam.CanQuery=false
-			beam.Material = Enum.Material.Neon; beam.Size = Vector3.new(0.2,0.2,dist)
-			beam.CFrame = CFrame.lookAt(p0,p1)*CFrame.new(0,0,-dist/2); beam.Parent = Workspace
-			Debris:AddItem(beam, 0.08)
-		end
-		local s = target:FindFirstChild("EnemyStats"); if s then s.Health.Value -= dmg end
-	elseif attackType == "AOE" then
-		local center = newTower.PrimaryPart and newTower.PrimaryPart.Position
-		if center then
-			for mob in pairs(MobSet) do
-				local h = mob:FindFirstChild("Hitbox"); local s = mob:FindFirstChild("EnemyStats")
-				if h and s and (h.Position-center).Magnitude <= range then s.Health.Value -= dmg end
-			end
-		end
-		if head and ParticleFolder:FindFirstChild("Explosion") then
-			local fx = ParticleFolder.Explosion:Clone(); fx.Parent = head
-			local s = fx:FindFirstChildWhichIsA("Sound",true); if s then pcall(s.Play,s) end
-			Debris:AddItem(fx, 2)
-		end
-	else
-		local s = target:FindFirstChild("EnemyStats"); if s then s.Health.Value -= dmg end
-	end
-
-	if config:FindFirstChild("Flying") then tower.HeliFaceTarget(newTower, target)
-	elseif config:FindFirstChild("Aviator") then
-	else tower.FaceTarget(newTower, target) end
-end
+tower.DoSecondaryAttackLogic = SecondaryAttack.new({
+	Tower = tower, Towers = Towers, IsCorrupted = isCorruptedTower,
+	CorruptionAttack = corruptionSecondaryAttack, MobSet = MobSet,
+})
 
 -- ============================================================
 -- START ATTACK LOOP
@@ -5627,6 +5252,7 @@ function tower.StartAttackLoop(newTower, player, carryOver)
 	Towers[newTower] = {
 		player       = player,
 		config       = config,
+		MatchGeneration = Match.Capture(),
 		lastAttack   = (carryOver and carryOver.lastAttack) or 0,
 		isBursting   = false,
 		burstGen     = 0,
@@ -5672,34 +5298,7 @@ end
 -- ============================================================
 -- BURST
 -- ============================================================
-function tower.Burst(newTower, initialTarget)
-	if not newTower or newTower:GetAttribute("ReaperSummoning") == true then return end
-	local data = Towers[newTower]
-	if not data or data.isBursting then return end
-	local config = data.config
-	if not config then return end
-
-	data.isBursting = true
-	data.burstGen   = (data.burstGen or 0) + 1
-	local gen = data.burstGen
-
-	task_spawn(function()
-		local maxBurst = config:FindFirstChild("MaxBurst") and config.MaxBurst.Value
-		local ogCd     = (config:FindFirstChild("OGCooldown") and config.OGCooldown.Value)
-			or config.Cooldown.Value
-
-		for i = 1, maxBurst do
-			if not (newTower and newTower.Parent) then break end
-			if Towers[newTower] ~= data or data.burstGen ~= gen then break end
-			tower.DoAttackLogic(newTower, data.player, config, i == 1 and initialTarget or nil)
-			task_wait(ogCd / getGameSpeed())
-		end
-
-		local delayVal = config:FindFirstChild("Delay") and config.Delay.Value
-		if delayVal and delayVal > 0 then waitGameSeconds(delayVal) end
-		if Towers[newTower] == data and data.burstGen == gen then data.isBursting = false end
-	end)
-end
+tower.Burst = BurstAttack.new({Tower = tower, Towers = Towers})
 
 -- ============================================================
 -- HELICOPTER (unchanged logic, data-driven from Heartbeat)
@@ -8382,122 +7981,10 @@ end
 -- Uses os_clock (not time()); Cowboy removed (DoAttackLogic handles it);
 -- secondary guarded with secondaryBursting flag.
 -- ============================================================
-RunService.Heartbeat:Connect(function(dt)
-	local now = os_clock()
-	local gs  = getGameSpeed()
-
-	for towerObj, data in next, Towers do
-		local config = data.config
-		if not towerObj or not towerObj.Parent or not config or not config.Parent then
-			Towers[towerObj] = nil; continue
-		end
-
-		local corruptedNow = isCorruptedTower(towerObj)
-		if data._seenCorrupt ~= corruptedNow then
-			data._seenCorrupt = corruptedNow
-			if corruptedNow then
-				print("[TDR Corruption] Active:", towerObj.Name, "Target:",
-					nearestCorruptionTower(towerObj, (config:FindFirstChild("Range") and config.Range.Value) or 0))
-			end
-		end
-		-- Full Reaper summon: suppress all new attacks while the client
-		-- plays the level-specific Summon animation.
-		if towerObj:GetAttribute("ReaperSummoning") == true then
-			continue
-		end
-		local flying     = config:FindFirstChild("Flying")
-		local burstValue = config:FindFirstChild("Burst")
-
-		local burst =
-			burstValue
-			and (
-				not burstValue:IsA("BoolValue")
-				or burstValue.Value == true
-			)
-		local cooldownVal = config.Cooldown and (config.Cooldown.Value / gs) or 1
-		local secondary  = config:FindFirstChild("Secondary")
-
-		-- Helicopter movement (high rate)
-		if flying then
-			local rate = data.heliRate or (1/60)
-			if now - (data.heliLast or 0) >= rate then
-				data.heliLast = now
-				pcall(tower.Helicopter, towerObj, data.player)
-			end
-		end
-
-		if config:FindFirstChild("Aviator") then
-			tower.Aviator(towerObj)
-		end
-
-		-- Primary attack
-		-- Primary attack
-		-- Primary attack
-		if data.isPhaser then
-			pcall(tower.PhaserTick, towerObj, data, now)
-		else
-			data.nextAttack = data.nextAttack or 0
-			if burst then
-				if now - (data.lastAttack or 0) >= cooldownVal then
-					-- Only consume this "charge" if a target actually exists —
-					-- otherwise the cooldown keeps accumulating instead of being
-					-- burned for nothing while nothing's in range.
-					if now >= (data.nextIdleCheck or 0) then
-						local targetMode = (config:FindFirstChild("TargetMode") and config.TargetMode.Value) or "First"
-						local range = config:FindFirstChild("Range") and config.Range.Value
-						local target = tower.FindTarget(towerObj, range, targetMode)
-						if target then
-							data.lastAttack = now
-							data.nextIdleCheck = nil
-							tower.Burst(towerObj, target)
-						else
-							data.nextIdleCheck = now + 0.2
-						end
-					end
-				end
-			else
-				if now >= data.nextAttack then
-					if now >= (data.nextIdleCheck or 0) then
-						local targetMode = (config:FindFirstChild("TargetMode") and config.TargetMode.Value) or "First"
-						local range = config:FindFirstChild("Range") and config.Range.Value
-						local target = tower.FindTarget(towerObj, range, targetMode)
-						if target then
-							data.nextAttack = now + cooldownVal
-							data.nextIdleCheck = nil
-							tower.DoAttackLogic(towerObj, data.player, config, target)
-						else
-							-- No target: leave nextAttack untouched so the elapsed
-							-- waiting time isn't thrown away. Poll again shortly
-							-- instead of hammering FindTarget every single frame.
-							data.nextIdleCheck = now + 0.2
-						end
-					end
-				end
-			end
-		end
-
-		-- Secondary attack (guarded: no new thread if previous burst still running)
-		if secondary then
-			data.nextSecondary = data.nextSecondary or 0
-			local secDelay     = ((secondary:FindFirstChild("Delay") and secondary.Delay.Value) or 0) / gs
-			local burstCount   = (secondary:FindFirstChild("MaxBurst") and secondary.MaxBurst.Value) or 1
-			local secCooldown  = ((secondary:FindFirstChild("Cooldown") and secondary.Cooldown.Value) or 1) / gs
-
-			if now >= data.nextSecondary and not data.secondaryBursting then
-				data.nextSecondary   = now + secDelay + burstCount * secCooldown
-				data.secondaryBursting = true
-				task_spawn(function()
-					if secDelay > 0 then task_wait(secDelay) end
-					for i = 1, burstCount do
-						if not towerObj.Parent then break end
-						tower.DoSecondaryAttackLogic(towerObj, data.player, config, secondary)
-						if i < burstCount then task_wait(secCooldown) end
-					end
-					data.secondaryBursting = false
-				end)
-			end
-		end
-	end
-end)
+local scheduler = CombatScheduler.new({
+	Tower = tower, Towers = Towers, IsCorrupted = isCorruptedTower,
+	Projectiles = ProjectileService,
+})
+RunService.Heartbeat:Connect(function(dt) scheduler:Step(dt) end)
 
 return tower
