@@ -42,7 +42,7 @@ A group in `Upgrades[2]` appears while inspecting a placed level 2 tower. It dis
 
 ## Generated UI and custom template
 
-Closed groups use the template's authored width and height. A Y scale is resolved against Main's visible height, so `{0.924, 0}, {0.095, 0}` is supported despite the generated auto-sized container. The fallback template remains 55 pixels tall. Clicking its header toggles expansion with a 0.25-second easing animation and animated arrow. Height follows visible wrapped text and updates when content layout changes. Groups open independently. Switching towers or levels closes the groups; refreshing the same tower and level preserves open state. Up to ten group frames are pooled and reused instead of recreated on every selection.
+Closed groups retain the template's exact authored UDim2, including `{0.924, 0}, {0.095, 0}`. Generated instances are direct children of Main so the Y scale has the same reference as the template. Expansion preserves those scale components and adds only the measured text height plus 16 pixels to the Y offset; closing restores the original UDim2. The fallback template also uses `{0.924, 0}, {0.095, 0}`. Clicking its header toggles expansion with a 0.25-second easing animation and animated arrow. Height follows visible wrapped text and updates when content layout changes. Groups open independently. Switching towers or levels closes the groups; refreshing the same tower and level preserves open state. Up to ten group frames are pooled and reused instead of recreated on every selection.
 
 To keep and customize the generated design:
 
@@ -70,7 +70,7 @@ AdvancedStatsTemplate (Frame; ClipsDescendants = true)
     Nine (TextLabel)
 ```
 
-Keep all nine labels, even for groups with fewer entries. Labels should use TextWrapped=true, AutomaticSize=Y, and a width filling Content. The default content has 14-pixel horizontal inset, 8-pixel row spacing, and 16 pixels below the last item. The live copy resolves Toggle height from its authored size at the closed height, so a full-size `{1, 0}, {1, 0}` Toggle stays confined to the header during expansion. Content keeps its authored X position, width, and anchor; its live Y position and height are calculated to fit below the header. A centered Content anchor of `0.5, 0.5` is supported. The saved template is not modified. The 16-pixel bottom spacing is configured in AdvancedStatsUI. Keep the template a direct child of Main; generated instances live under Main.AdvancedStats.
+Keep all nine labels, even for groups with fewer entries. Labels should use TextWrapped=true, AutomaticSize=Y, and a width filling Content. The default content has 14-pixel horizontal inset, 8-pixel row spacing, and 16 pixels below the last item. The live copy resolves Toggle height from its authored size at the closed height, so a full-size `{1, 0}, {1, 0}` Toggle stays confined to the header during expansion. Content keeps its authored X position, width, and anchor; its live Y position and height are calculated to fit below the header. A centered Content anchor of `0.5, 0.5` is supported. The saved template is not modified. The 16-pixel bottom spacing is configured in AdvancedStatsUI. Keep the template a direct child of Main; generated instances are named AdvancedStats1–10 directly under Main, after existing rows by LayoutOrder.
 
 The saved template is used at startup; edit outside Play and restart to preview changes. The template is never edited or destroyed by normal selection changes. If no template is supplied, a default is generated once per controller lifetime.
 

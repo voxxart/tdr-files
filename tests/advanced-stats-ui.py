@@ -16,7 +16,7 @@ end
 local objects=0
 local function node(class)
  objects+=1
- local n={Name=class,Class=class,Children={},Signals={},Activated=signal(),Visible=true,AnchorPoint={X=0,Y=0},AbsoluteSize={Y=1000},AbsoluteContentSize={Y=100},Scale=1}
+ local n={Name=class,Class=class,Children={},Signals={},Activated=signal(),Visible=true,AnchorPoint={X=0,Y=0},AbsoluteSize={Y=1000},AbsoluteCanvasSize={Y=1000},AbsoluteContentSize={Y=100},Scale=1}
  local mt={}
  mt.__index=function(self,key)
   if key=='Parent' then return rawget(self,'_Parent') end
@@ -68,21 +68,21 @@ assert(ui.Template.Name=='AdvancedStatsTemplate' and not ui.Template.Visible)
 local def={Upgrades={[1]={AdvancedStats1={Title='Abilities',One='First',Nine='Last'},AdvancedStats2={Title='Second',Two='Middle'}},[2]={}}}
 local identity={}
 ui:ShowLevel(def,1,identity)
-assert(#ui.Records==2 and ui.Root.Visible)
+assert(#ui.Records==2 and ui.Records[1].Frame.Visible)
 local record=ui.Records[1]
 assert(record.Header.Title.Text=='Abilities' and record.Body.One.Visible and record.Body.Nine.Visible and not record.Body.Two.Visible)
-record.Header.Activated:Fire(); assert(record.Open and record.Tween.Goal.Size.Y.Offset==171)
+record.Header.Activated:Fire(); assert(record.Open and record.Tween.Goal.Size.Y.Scale==0.095 and record.Tween.Goal.Size.Y.Offset==116)
 local opening=record.Tween; record.Header.Activated:Fire()
-assert(not record.Open and opening.Cancelled and record.Tween.Goal.Size.Y.Offset==55)
+assert(not record.Open and opening.Cancelled and record.Tween.Goal.Size.Y.Scale==0.095 and record.Tween.Goal.Size.Y.Offset==0)
 record.Header.Activated:Fire(); record.Tween:Finish()
 record.Body:FindFirstChildOfClass('UIListLayout').AbsoluteContentSize={Y=220}
 record.Body:FindFirstChildOfClass('UIListLayout'):GetPropertyChangedSignal('AbsoluteContentSize'):Fire()
-assert(record.Tween.Goal.Size.Y.Offset==291,'wrapping/content changes must resize open groups')
+assert(record.Tween.Goal.Size.Y.Offset==236,'wrapping/content changes must resize open groups')
 local count=objects; ui:ShowLevel(def,1,identity); assert(objects==count and record.Open,'same selection preserves open state')
-ui:ShowLevel(def,2,identity); assert(not ui.Root.Visible and not record.Open)
+ui:ShowLevel(def,2,identity); assert(not record.Frame.Visible and not record.Open)
 ui:ShowLevel(def,1,{}); assert(objects==count and not record.Open,'records must be pooled')
 local template=ui.Template
-ui:Destroy(); assert(template.Destroyed and ui.Root.Destroyed and host.AutomaticCanvasSize==0)
+ui:Destroy(); assert(template.Destroyed and record.Frame.Destroyed and host.AutomaticCanvasSize==0)
 for _,c in record.Header.Activated.Callbacks do assert(not c.C.Connected) end
 -- An authored template is reused and kept on cleanup.
 local custom=template:Clone(); custom.Destroyed=nil; custom.Parent=host
@@ -95,13 +95,13 @@ local reused=UI.new(host); assert(reused.Template==custom and not reused.OwnTemp
 assert(host.AutomaticCanvasSize==0,'Main canvas setting must remain authored')
 reused:ShowLevel(def,1,{})
 local scaled=reused.Records[1]
-assert(scaled.Frame.Size.X.Scale==0.924 and scaled.Frame.Size.Y.Offset==95)
+assert(scaled.Frame.Size.X.Scale==0.924 and scaled.Frame.Size.Y.Scale==0.095 and scaled.Frame.Size.Y.Offset==0 and scaled.Frame.Parent==host)
 assert(scaled.Header.Size.Y.Offset==95 and scaled.Body.AnchorPoint.Y==0.5)
 assert(scaled.Body.Position.X.Scale==0.5 and scaled.Body.Position.Y.Offset==145)
-scaled.Header.Activated:Fire(); assert(scaled.Tween.Goal.Size.Y.Offset==211)
+scaled.Header.Activated:Fire(); assert(scaled.Tween.Goal.Size.Y.Scale==0.095 and scaled.Tween.Goal.Size.Y.Offset==116)
 assert(scaled.Header.Size.Y.Offset==95,'header must not expand over the content')
-host.AbsoluteSize={Y=800}; host:GetPropertyChangedSignal('AbsoluteSize'):Fire()
-assert(scaled.Header.Size.Y.Offset==76 and scaled.Frame.Size.Y.Offset==192)
+host.AbsoluteCanvasSize={Y=800}; host:GetPropertyChangedSignal('AbsoluteCanvasSize'):Fire()
+assert(scaled.Header.Size.Y.Offset==76 and scaled.Frame.Size.Y.Scale==0.095 and scaled.Frame.Size.Y.Offset==116)
 assert(custom.Size.Y.Scale==0.095 and custom.Toggle.Size.Y.Scale==1 and custom.Content.Position.Y.Scale==0.5,'template must remain unchanged')
 reused:Destroy(); assert(not custom.Destroyed)
 -- Server stat merge must ignore level-local display tables.

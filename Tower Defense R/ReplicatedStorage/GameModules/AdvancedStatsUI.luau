@@ -11,11 +11,11 @@ local function create(class,parent,properties)
 end
 
 local function defaultTemplate(host)
- local frame=create('Frame',nil,{Name='AdvancedStatsTemplate',Visible=false,Size=UDim2.new(1,0,0,55),
+ local frame=create('Frame',nil,{Name='AdvancedStatsTemplate',Visible=false,Size=UDim2.new(0.924,0,0.095,0),
   BackgroundColor3=Color3.fromRGB(25,31,43),BorderSizePixel=0,ClipsDescendants=true,Active=true})
  create('UICorner',frame,{CornerRadius=UDim.new(0,8)})
  create('UIStroke',frame,{Color=Color3.fromRGB(100,122,155),Transparency=0.65,Thickness=1})
- local header=create('TextButton',frame,{Name='Toggle',Size=UDim2.new(1,0,0,55),
+ local header=create('TextButton',frame,{Name='Toggle',Size=UDim2.new(1,0,1,0),
   BackgroundTransparency=1,Text='',AutoButtonColor=false,Selectable=true})
  create('TextLabel',header,{Name='Title',Position=UDim2.fromOffset(14,0),Size=UDim2.new(1,-58,1,0),
   BackgroundTransparency=1,Text='Advanced Stats',Font=Enum.Font.GothamBold,TextSize=17,
@@ -45,9 +45,6 @@ function UI.new(host)
  if not host:FindFirstChildOfClass('UIListLayout') then
   self.HostLayout=create('UIListLayout',host,{SortOrder=Enum.SortOrder.LayoutOrder,Padding=UDim.new(0,8)})
  end
- self.Root=create('Frame',host,{Name='AdvancedStats',BackgroundTransparency=1,
-  Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,LayoutOrder=1000,Visible=false})
- create('UIListLayout',self.Root,{SortOrder=Enum.SortOrder.LayoutOrder,Padding=UDim.new(0,8)})
  return self
 end
 
@@ -62,12 +59,11 @@ function UI:Clear()
   record.Open=false; record.Frame.Visible=false
   record.Resize(false); record.Arrow.Rotation=0
  end
- self.Root.Visible=false
 end
 
 function UI:CreateRecord()
  local frame=self.Template:Clone()
- frame.Parent=self.Root; frame.Visible=false
+ frame.Parent=self.Host; frame.Visible=false
  local header=frame:WaitForChild('Toggle')
  local arrow=header:WaitForChild('Arrow')
  local body=frame:WaitForChild('Content')
@@ -90,16 +86,17 @@ function UI:CreateRecord()
  end
  local function resize(animate)
   if record.Tween then record.Tween:Cancel(); record.Tween=nil end
-  -- Resolve the authored collapsed scale against Main, not the auto-sized root.
-  local closedHeight=self.Host.AbsoluteSize.Y/scaleFactor(self.Host)*closedSize.Y.Scale+closedSize.Y.Offset
+  -- Frames stay directly in Main, preserving the authored scale dimensions.
+  local parentSize=if self.Host:IsA('ScrollingFrame') then self.Host.AbsoluteCanvasSize else self.Host.AbsoluteSize
+  local closedHeight=parentSize.Y/scaleFactor(self.Host)*closedSize.Y.Scale+closedSize.Y.Offset
   local headerHeight=closedHeight*headerSize.Y.Scale+headerSize.Y.Offset
   local contentHeight=layout.AbsoluteContentSize.Y/scaleFactor(body)
   -- Keep a full-size Toggle at its collapsed height while its parent expands.
   header.Size=UDim2.new(headerSize.X.Scale,headerSize.X.Offset,0,headerHeight)
   body.Size=UDim2.new(bodySize.X.Scale,bodySize.X.Offset,0,contentHeight)
   body.Position=UDim2.new(bodyPosition.X.Scale,bodyPosition.X.Offset,0,headerHeight+contentHeight*bodyAnchor.Y)
-  local height=closedHeight+(if record.Open then contentHeight+16 else 0)
-  local target=UDim2.new(closedSize.X.Scale,closedSize.X.Offset,0,height)
+  local extra=if record.Open then contentHeight+16 else 0
+  local target=UDim2.new(closedSize.X.Scale,closedSize.X.Offset,closedSize.Y.Scale,closedSize.Y.Offset+extra)
   if animate==false then frame.Size=target; return end
   record.Tween=TweenService:Create(frame,TweenInfo.new(0.25,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),{Size=target})
   record.Tween:Play()
@@ -115,7 +112,7 @@ function UI:CreateRecord()
  table.insert(self.Connections,layout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
   if frame.Visible then resize(record.Open) end
  end))
- table.insert(self.Connections,self.Host:GetPropertyChangedSignal('AbsoluteSize'):Connect(function()
+ table.insert(self.Connections,self.Host:GetPropertyChangedSignal(if self.Host:IsA('ScrollingFrame') then 'AbsoluteCanvasSize' else 'AbsoluteSize'):Connect(function()
   if frame.Visible then resize(false) end
  end))
  return record
@@ -123,12 +120,11 @@ end
 
 function UI:Render(groups)
  self:Clear()
- self.Root.Visible=#groups>0
  for order,group in ipairs(groups) do
   local record=self.Records[order]
   if not record then record=self:CreateRecord(); self.Records[order]=record end
   record.Frame.Name='AdvancedStats'..group.Index
-  record.Frame.LayoutOrder=order
+  record.Frame.LayoutOrder=1000+order
   record.Header.Title.Text=group.Title
   for _,name in ipairs(Data.LabelNames) do
    local label=record.Body:WaitForChild(name)
@@ -150,8 +146,8 @@ end
 function UI:Destroy()
  self:Clear()
  for _,connection in self.Connections do connection:Disconnect() end
+ for _,record in self.Records do record.Frame:Destroy() end
  table.clear(self.Connections); table.clear(self.Records)
- self.Root:Destroy()
  if self.OwnTemplate then self.Template:Destroy() end
  if self.HostLayout then self.HostLayout:Destroy() end
 end
