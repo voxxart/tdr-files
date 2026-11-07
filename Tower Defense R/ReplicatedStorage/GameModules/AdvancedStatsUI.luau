@@ -67,6 +67,16 @@ function UI:CreateRecord()
  local header=frame:WaitForChild('Toggle')
  local arrow=header:WaitForChild('Arrow')
  local body=frame:WaitForChild('Content')
+ -- The expanding frame controls layout and clipping; its outline belongs to
+ -- the fixed-height header so it does not stretch around the open content.
+ local corner=frame:FindFirstChildOfClass('UICorner')
+ if corner and not header:FindFirstChildOfClass('UICorner') then corner:Clone().Parent=header end
+ for _,child in frame:GetChildren() do
+  if child:IsA('UIStroke') then
+   child.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
+   child.Parent=header
+  end
+ end
  local layout=assert(body:FindFirstChildOfClass('UIListLayout'),'AdvancedStatsTemplate.Content needs a UIListLayout')
  local record={Frame=frame,Header=header,Arrow=arrow,Body=body,Open=false}
  local closedSize=self.Template.Size

@@ -30,6 +30,7 @@ local function node(class)
  end
  setmetatable(n,mt)
  function n:IsA(kind) return self.Class==kind or kind=='GuiObject' and (self.Class=='Frame' or self.Class=='ScrollingFrame' or self.Class=='TextLabel' or self.Class=='TextButton') end
+ function n:GetChildren() local list={} for _,child in self.Children do table.insert(list,child) end return list end
  function n:FindFirstChild(key) return self.Children[key] end
  function n:WaitForChild(key) return assert(self.Children[key],key) end
  function n:FindFirstChildOfClass(kind) for _,c in self.Children do if c.Class==kind then return c end end end
@@ -57,7 +58,7 @@ local env=setmetatable({Instance={new=node},script={Parent={AdvancedStatsData='d
  game={GetService=function() return tweenService end},
  UDim2={new=dim,fromOffset=function(x,y) return dim(0,x,0,y) end},UDim={new=function(a,b) return {Scale=a,Offset=b} end},
  Vector2={new=function(x,y) return {X=x,Y=y} end},Color3={fromRGB=function(...) return {...} end},
- Enum={AutomaticSize={Y=1,None=0},SortOrder={LayoutOrder=1},Font={Gotham=1,GothamBold=2},TextXAlignment={Left=1},TextYAlignment={Top=1},EasingStyle={Quart=1,Quad=2},EasingDirection={Out=1}},
+ Enum={ApplyStrokeMode={Border=1},AutomaticSize={Y=1,None=0},SortOrder={LayoutOrder=1},Font={Gotham=1,GothamBold=2},TextXAlignment={Left=1},TextYAlignment={Top=1},EasingStyle={Quart=1,Quad=2},EasingDirection={Out=1}},
  TweenInfo={new=function(...) return {...} end}},{__index=getfenv()})
 local data=assert(loadstring(source1))()
 env.require=function(id) assert(id=='data'); return data end
@@ -70,8 +71,11 @@ local identity={}
 ui:ShowLevel(def,1,identity)
 assert(#ui.Records==2 and ui.Records[1].Frame.Visible)
 local record=ui.Records[1]
+assert(not record.Frame:FindFirstChildOfClass('UIStroke') and record.Header:FindFirstChildOfClass('UIStroke'),'outline must belong to fixed header')
 assert(record.Header.Title.Text=='Abilities' and record.Body.One.Visible and record.Body.Nine.Visible and not record.Body.Two.Visible)
 record.Header.Activated:Fire(); assert(record.Open and record.Tween.Goal.Size.Y.Scale==0.095 and record.Tween.Goal.Size.Y.Offset==116)
+local headerHeight=record.Header.Size.Y.Offset
+record.Tween:Finish(); assert(record.Header.Size.Y.Offset==headerHeight,'opening must not stretch outlined header')
 local opening=record.Tween; record.Header.Activated:Fire()
 assert(not record.Open and opening.Cancelled and record.Tween.Goal.Size.Y.Scale==0.095 and record.Tween.Goal.Size.Y.Offset==0)
 record.Header.Activated:Fire(); record.Tween:Finish()
