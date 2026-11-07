@@ -9,9 +9,9 @@ No existing game scripts, remotes, tower templates, or damage logic need replaci
 
 ## Behavior
 
-Primary Attack animation events produce a moving warm-white bullet for towers whose resolved damage type is `Bullet`. The source is `Weapon.Handle` (lowercase `weapon` also supported). If that Handle contains a **Barrel Attachment**, its WorldPosition is used instead. Otherwise the bullet starts at Handle.Position. Missing weapons/handles skip the cosmetic without affecting gameplay. Upgrades that replace Weapon/Handle invalidate the cached muzzle automatically.
+Primary Attack animation events produce a moving muted brass-colored bullet for towers whose resolved damage type is `Bullet`. The source is `Weapon.Handle` (lowercase `weapon` also supported). If that Handle contains a **Barrel Attachment**, its WorldPosition is used instead. Otherwise the bullet starts at Handle.Position. Missing weapons/handles skip the cosmetic without affecting gameplay. Upgrades that replace Weapon/Handle invalidate the cached muzzle automatically.
 
-Bullets travel toward the enemy's rendered HumanoidRootPart/PrimaryPart, with Hitbox as a fallback. The endpoint is captured when the event arrives. Tracers do not home, collide, raycast, or apply damage. Existing muzzle flashes, animations, and sounds continue. This batch adds bullets to primary Attack events, not secondary rocket attacks or unit attacks.
+Bullets travel toward the enemy's rendered HumanoidRootPart/PrimaryPart, with Hitbox as a fallback. The endpoint is captured when the event arrives, with a small random cosmetic spread (0.6 degrees, capped at 0.65 studs). SmoothPlastic and slight transparency soften the appearance without neon bloom. This does not change authoritative accuracy or damage. Tracers do not home, collide, raycast, or apply damage. Existing muzzle flashes, animations, and sounds continue. This batch adds bullets to primary Attack events, not secondary rocket attacks or unit attacks.
 
 All cosmetics run locally using the existing attack event, with no additional network messages. One shared RenderStepped loop moves pooled anchored parts in one BulkMoveTo batch per frame. There are no per-bullet tasks, tweens, event connections, or server projectile instances. Parts are reused after flight and retained within a fixed allocation limit. They cannot collide, touch, query, or cast shadows.
 
@@ -29,6 +29,9 @@ Edit `BulletTracers.Settings`:
 | Speed | 500 | Nominal flight speed in studs per game second |
 | Length | 1.8 | Maximum visible bullet length |
 | Width | 0.09 | Bullet thickness |
+| SpreadDegrees | 0.6 | Cosmetic spread half-angle |
+| MaxSpread | 0.65 | Maximum endpoint deviation in studs |
+| Transparency | 0.12 | Visible bullet transparency |
 | MaxDistance | 350 | Maximum camera-to-muzzle distance for rendering |
 
 Flight duration is clamped to 0.05–0.5 game seconds for visibility and bounded lifetime. Very high attack rates or a full pool skip extra visuals; authoritative attacks and damage continue normally. These are visual budgets, not a promise to display every shot under arbitrary load. Existing animation and sound systems still have their own costs.

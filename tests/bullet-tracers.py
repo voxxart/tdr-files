@@ -23,8 +23,8 @@ local environment=setmetatable({
  Instance={new=function(kind)
   if kind=='Part' then partsCreated+=1 end
   return {Destroy=function(self) self.Destroyed=true end}
- end},Vector3={new=vec,zero=vec(0,0,0)},CFrame={lookAt=function() return {Rotation=rot} end},
- Enum={Material={Neon=1},BulkMoveMode={FireCFrameChanged=1}},Color3={fromRGB=function(...) return {...} end}
+ end},Vector3={new=vec,zero=vec(0,0,0)},CFrame={lookAt=function() return {Rotation=rot,RightVector=vec(0,0,1),UpVector=vec(0,1,0)} end},
+ Enum={Material={Neon=1,SmoothPlastic=2},BulkMoveMode={FireCFrameChanged=1}},Color3={fromRGB=function(...) return {...} end}
 },{__index=getfenv()})
 local chunk=assert(loadstring(source)); setfenv(chunk,environment)
 local Tracers=chunk(); local pool=Tracers.new(world)
@@ -32,6 +32,16 @@ local from,to=vec(0,0,0),vec(100,0,0)
 assert(not pool:Emit(from,from) and partsCreated==0)
 for i=1,64 do assert(pool:Emit(from,to)) end
 assert(not pool:Emit(from,to) and partsCreated==64)
+local first=pool.Active[1].Direction
+local varied=false
+for _,record in pool.Active do
+ local endpoint=record.From+record.Direction*record.Distance
+ local error=endpoint-to
+ assert(error.Magnitude<=Tracers.Settings.MaxSpread+0.00001,'spread must remain bounded')
+ if record.Direction.Y~=first.Y or record.Direction.Z~=first.Z then varied=true end
+ assert(record.Part.Material==2 and record.Part.Transparency==0.12)
+end
+assert(varied,'shots should have different cosmetic spread')
 pool:Step(0.01,1,false)
 assert(batches==1 and #pool.Active==64)
 local part=pool.Active[1].Part

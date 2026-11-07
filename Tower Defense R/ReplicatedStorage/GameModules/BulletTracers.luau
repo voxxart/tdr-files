@@ -1,7 +1,7 @@
 -- Client cosmetic pool. No per-shot tweens, tasks, connections, physics, or remotes.
 local Tracers={}
 Tracers.__index=Tracers
-Tracers.Settings={MaxActive=256,ShotsPerSecond=1200,Burst=64,Speed=500,Length=1.8,Width=0.09,MaxDistance=350}
+Tracers.Settings={MaxActive=256,ShotsPerSecond=1200,Burst=64,Speed=500,Length=1.8,Width=0.09,MaxDistance=350,SpreadDegrees=0.6,MaxSpread=0.65,Transparency=0.12}
 function Tracers.new(world)
  local folder=Instance.new('Folder'); folder.Name='TowerBulletVisuals'; folder.Parent=world
  return setmetatable({World=world,Folder=folder,Active={},Free={},Created=0,Tokens=Tracers.Settings.Burst,Parts={},Frames={}},Tracers)
@@ -12,12 +12,19 @@ function Tracers:Emit(from,to)
  local delta=to-from
  local distance=delta.Magnitude
  if distance~=distance or distance<0.01 or distance==math.huge then return false end
+ -- Cosmetic disk spread around the captured aim point, capped at long range.
+ local basis=CFrame.lookAt(from,to)
+ local radius=math.min(settings.MaxSpread,distance*math.tan(math.rad(settings.SpreadDegrees)))
+ local angle=math.random()*math.pi*2
+ local offset=math.sqrt(math.random())*radius
+ to=to+basis.RightVector*(math.cos(angle)*offset)+basis.UpVector*(math.sin(angle)*offset)
+ delta=to-from; distance=delta.Magnitude
  local record=table.remove(self.Free)
  if not record then
   if self.Created>=settings.MaxActive then return false end
   local part=Instance.new('Part')
   part.Name='BulletTracer'; part.Anchored=true; part.CanCollide=false; part.CanTouch=false; part.CanQuery=false
-  part.CastShadow=false; part.Material=Enum.Material.Neon; part.Color=Color3.fromRGB(255,224,145)
+  part.CastShadow=false; part.Material=Enum.Material.SmoothPlastic; part.Color=Color3.fromRGB(225,204,152)
   part.Transparency=1; part.Parent=self.Folder
   record={Part=part}; self.Created+=1
  end
@@ -26,7 +33,7 @@ function Tracers:Emit(from,to)
  record.Duration=math.clamp(distance/settings.Speed,0.05,0.5)
  record.Rotation=CFrame.lookAt(Vector3.zero,record.Direction).Rotation
  record.Part.Size=Vector3.new(settings.Width,settings.Width,0.01)
- record.Part.CFrame=record.Rotation+from; record.Part.Transparency=0
+ record.Part.CFrame=record.Rotation+from; record.Part.Transparency=settings.Transparency
  table.insert(self.Active,record)
  return true
 end
