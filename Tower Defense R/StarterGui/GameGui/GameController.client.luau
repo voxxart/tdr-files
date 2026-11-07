@@ -40,6 +40,10 @@ local TowerhoverGui = gui.TowerHoverGui
 local upgradeGui = gui.UpgradeUI
 local info = workspace:WaitForChild("Info")
 
+hoverGui.Active = false
+UnitHoverGui.Active = false
+TowerhoverGui.Active = false
+
 local hoveredInstance = nil
 local selectedTower = nil
 local towerToSpawn = nil
@@ -505,162 +509,15 @@ local function PlacementRaycast(model)
 	return result, mousePosition, isInsideBorder(result.Position)
 end
 
-local InteractiveTowersFolder = workspace:WaitForChild("Towers")
-local InteractiveMobsFolder = workspace:WaitForChild("Mobs")
-local InteractiveUnitsFolder = workspace:WaitForChild("Units")
+local interaction = require(ReplicatedStorage.GameModules:WaitForChild("TowerInteraction")).new(workspace, plr:WaitForChild("PlayerGui"))
+local actionGate = require(ReplicatedStorage.GameModules:WaitForChild("TowerActionGate")).new()
+script.Destroying:Connect(function() interaction:Destroy() end)
 
--- Raise this to ~2.25 if you want even easier targeting.
-local INTERACTION_ASSIST_RADIUS = 0.1
-
-local function resolveInteractiveModel(instance)
-	local current = instance
-
-	while current and current ~= workspace do
-		if current:IsA("Model") then
-			if current.Parent == InteractiveTowersFolder
-				and current:FindFirstChild("Config")
-			then
-				return current, "Tower"
-			end
-
-			if current.Parent == InteractiveMobsFolder
-				and current:FindFirstChild("EnemyStats")
-			then
-				return current, "Mob"
-			end
-
-			if current.Parent == InteractiveUnitsFolder
-				and current:FindFirstChild("EnemyStats")
-			then
-				return current, "Unit"
-			end
-		end
-
-		current = current.Parent
-	end
-
-	return nil, nil
+local function MouseRaycast(model, position)
+	position = position or UserInputService:GetMouseLocation()
+	local result, target, kind = interaction:Pick(position, model)
+	return result, position, false, target, kind
 end
-
-local function buildMainMouseRayParams(model)
-	local rayCastParams = RaycastParams.new()
-	rayCastParams.FilterType = Enum.RaycastFilterType.Exclude
-	rayCastParams.IgnoreWater = true
-
-	local blackList = { camera }
-
-	if model and not model:IsDescendantOf(InteractiveTowersFolder) then
-		table.insert(blackList, model)
-	end
-
-	local dependencies = workspace:FindFirstChild("GameDependencies")
-	if dependencies then
-		local range = dependencies:FindFirstChild("Range")
-		if range then
-			table.insert(blackList, range)
-		end
-	end
-
-	for _, player in ipairs(Players:GetPlayers()) do
-		if player.Character then
-			table.insert(blackList, player.Character)
-		end
-	end
-
-	rayCastParams.FilterDescendantsInstances = blackList
-
-	return rayCastParams
-end
-
-local InteractionAssistParams = RaycastParams.new()
-InteractionAssistParams.FilterType = Enum.RaycastFilterType.Include
-InteractionAssistParams.IgnoreWater = true
-InteractionAssistParams.FilterDescendantsInstances = {
-	InteractiveTowersFolder,
-	InteractiveMobsFolder,
-	InteractiveUnitsFolder,
-}
-
-
-
---------------------------------------------------
--- MAIN RAYCAST
---------------------------------------------------
-local function MouseRaycast(model)
-	local mousePosition = UserInputService:GetMouseLocation()
-	local smoothedMousePos = SmoothMousePosition(mousePosition)
-
-	local mouseRay =
-		camera:ViewportPointToRay(
-			smoothedMousePos.X,
-			smoothedMousePos.Y
-		)
-
-	local direction = mouseRay.Direction * 1000
-
-	-- Precise ray first.
-	local exactResult =
-		workspace:Raycast(
-			mouseRay.Origin,
-			direction,
-			buildMainMouseRayParams(model)
-		)
-
-	if exactResult then
-		local exactModel, exactKind =
-			resolveInteractiveModel(
-				exactResult.Instance
-			)
-
-		if exactModel then
-			return
-				exactResult,
-				smoothedMousePos,
-				isInsideBorder(exactResult.Position),
-				exactModel,
-				exactKind
-		end
-	end
-
-	-- Forgiving ray around the cursor.
-	-- Only Towers/Mobs/Units are included, so the map floor does not block it.
-	local assistedResult =
-		workspace:Spherecast(
-			mouseRay.Origin,
-			INTERACTION_ASSIST_RADIUS,
-			direction,
-			InteractionAssistParams
-		)
-
-	if assistedResult then
-		local assistedModel, assistedKind =
-			resolveInteractiveModel(
-				assistedResult.Instance
-			)
-
-		if assistedModel then
-			return
-				assistedResult,
-				smoothedMousePos,
-				isInsideBorder(assistedResult.Position),
-				assistedModel,
-				assistedKind
-		end
-	end
-
-	if exactResult then
-		return
-			exactResult,
-			smoothedMousePos,
-			isInsideBorder(exactResult.Position),
-			nil,
-			nil
-	end
-
-	return nil, smoothedMousePos, false, nil, nil
-end
-
-
 
 local function MouseRaycast2(model)
 	local mousePosition = UserInputService:GetMouseLocation()
@@ -1165,7 +1022,13 @@ local function playAnimation(object, animName)
 	animationTrack:AdjustSpeed(speed)
 end
 
+local selectedRangeCircle
+local function clearSelectedRange()
+	if selectedRangeCircle then selectedRangeCircle:Destroy(); selectedRangeCircle = nil end
+end
+script.Destroying:Connect(clearSelectedRange)
 local function CreateRangeCircle(tower, placeholder)
+	if not placeholder then clearSelectedRange() end
 	if not tower or not tower.PrimaryPart then
 		warn("No Primary Part Found In Tower")
 		return
@@ -1252,7 +1115,7 @@ local function CreateRangeCircle(tower, placeholder)
 	--------------------------------------------------------------------------------
 	local heartbeat
 	heartbeat = RunService.Heartbeat:Connect(function()
-		if not tower or not tower.Parent or not tower.PrimaryPart then
+		if not rangeModel.Parent or not tower or not tower.Parent or not tower.PrimaryPart then
 			heartbeat:Disconnect()
 			return
 		end
@@ -1273,6 +1136,8 @@ local function CreateRangeCircle(tower, placeholder)
 			if LP then LP.CFrame = updatedCFrame * CFrame.new(0, 0.045, 0) end
 		end
 	end)
+
+	rangeModel.Destroying:Connect(function() heartbeat:Disconnect() end)
 
 	--------------------------------------------------------------------------------
 	-- PLACEHOLDER MODE
@@ -1309,7 +1174,8 @@ local function CreateRangeCircle(tower, placeholder)
 			LP.Size = Vector3.new(0.2, range * 2, range * 2)
 		end
 
-		rangeModel.Parent = workspace.Camera
+		rangeModel.Parent = workspace.CurrentCamera
+		selectedRangeCircle = rangeModel
 	end
 end
 
@@ -1835,7 +1701,8 @@ end
 
 local currentSelectionId = 0
 local function toggleTowerInfo()
-	workspace.Camera:ClearAllChildren()
+	clearSelectedRange()
+	interaction:Update(hoveredModel, selectedTower)
 	gui.OtherGameStats.MaxTowersBanner.TextLabel.Text = tostring(placedTowers.Value) .. "/" .. tostring(getPlacement())
 	currentSelectionId += 1
 	local thisSelection = currentSelectionId
@@ -3767,91 +3634,40 @@ workspace.Info.GameSpeed.Changed:Connect(function(change)
 	end)
 end)
 
-local originalSize = gui.UpgradeUI.ExtraButtons.Target.Size
-local pressedSize = originalSize - UDim2.new(0, 6, 0, 6) 
-local inTweenInfo = TweenInfo.new(0.02, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-local outTweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-gui.UpgradeUI.ExtraButtons.Target.Activated:Connect(function()
-	if selectedTower then
-		local modeChangeSuccess = changeModeFunction:InvokeServer(selectedTower)
-		if modeChangeSuccess then
-
-			local shrink = TweenService:Create(gui.UpgradeUI.ExtraButtons.Target, inTweenInfo, { Size = pressedSize })
-			local grow = TweenService:Create(gui.UpgradeUI.ExtraButtons.Target, outTweenInfo, { Size = originalSize })
-			shrink:Play()
-			shrink.Completed:Wait()
-			grow:Play()
-			toggleTowerInfo()
+-- Buttons and hotkeys share validation and one pending mutation per tower.
+local function performTowerAction(action)
+	local tower = selectedTower
+	local live, kind = interaction:Resolve(tower)
+	if live ~= tower or kind ~= "Tower" or GameWrapUp then return end
+	local owner = tower.Config:FindFirstChild("Owner")
+	if not owner or owner.Value ~= plr.Name then return end
+	if action == "Upgrade" and not hasNextUpgrade(tower) then return end
+	local remote = if action == "Upgrade" then upgradeTowerFunction elseif action == "Sell" then sellTowerFunction else changeModeFunction
+	local ok, success = actionGate:Run(tower, function(captured)
+		return remote:InvokeServer(captured)
+	end)
+	if not ok then
+		if success then warn("Tower action failed:", action, success) end
+		return
+	end
+	if not success then return end
+	if action ~= "Target" then gui.Sounds.Upgrade:Play() end
+	if action == "Upgrade" and tower.Parent then
+		local root = tower:FindFirstChild("HumanoidRootPart")
+		if root then
+			local particle = ReplicatedStorage.Particle.Upgrade:Clone()
+			particle.Parent = root; particle:Emit(5)
+			game:GetService("Debris"):AddItem(particle, 5)
 		end
 	end
-end)
-local originalSize = upgradeGui.Upgrade.Size
-local pressedSize = originalSize - UDim2.new(0, 6, 0, 6) 
-local inTweenInfo = TweenInfo.new(0.02, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-local outTweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-
-upgradeGui.Upgrade.Activated:Connect(function()
-	if not selectedTower then return end
-	if not selectedTower:FindFirstChild("Config") then return end
-	if selectedTower.Config.Health.HealthValue.Value <= 0 then return end
-	if selectedTower.Config.Owner.Value ~= Players.LocalPlayer.Name then return end
-	if not hasNextUpgrade(selectedTower) then return end
-
-	local upgradeSuccess =
-		upgradeTowerFunction:InvokeServer(selectedTower)
-
-	if upgradeSuccess then
-		local shrink =
-			TweenService:Create(
-				upgradeGui.Upgrade,
-				inTweenInfo,
-				{ Size = pressedSize }
-			)
-
-		local grow =
-			TweenService:Create(
-				upgradeGui.Upgrade,
-				outTweenInfo,
-				{ Size = originalSize }
-			)
-
-		shrink:Play()
-		shrink.Completed:Wait()
-		grow:Play()
-
-		gui.Sounds.Upgrade:Play()
-
-		-- Upgrade is in-place; selectedTower is still the same Instance.
-		local particle = ReplicatedStorage.Particle.Upgrade:Clone()
-		particle.Parent = selectedTower.HumanoidRootPart
-		particle:Emit(5)
-
-		updateOwnerBoxColor(selectedTower)
-		toggleTowerInfo()
-	end
-end)
-local originalSize = gui.UpgradeUI.ExtraButtons.Sell.Size
-local pressedSize = originalSize - UDim2.new(0, 6, 0, 6) 
-local inTweenInfo = TweenInfo.new(0.02, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-local outTweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-
-gui.UpgradeUI.ExtraButtons.Sell.Activated:Connect(function()
-	if selectedTower then
-		local soldTower = sellTowerFunction:InvokeServer(selectedTower)
-
-		if soldTower then
-			local shrink = TweenService:Create(gui.UpgradeUI.ExtraButtons.Sell, inTweenInfo, { Size = pressedSize })
-			local grow = TweenService:Create(gui.UpgradeUI.ExtraButtons.Sell, outTweenInfo, { Size = originalSize })
-
-			shrink:Play()
-			shrink.Completed:Wait()
-			grow:Play()
-			gui.Sounds.Upgrade:play()
-			selectedTower = nil
-			toggleTowerInfo()
-		end
-	end
-end)
+	-- A response for tower A must never close or repaint tower B's panel.
+	if selectedTower ~= tower then return end
+	if action == "Sell" then selectedTower = nil end
+	toggleTowerInfo()
+end
+upgradeGui.Upgrade.Activated:Connect(function() performTowerAction("Upgrade") end)
+gui.UpgradeUI.ExtraButtons.Sell.Activated:Connect(function() performTowerAction("Sell") end)
+gui.UpgradeUI.ExtraButtons.Target.Activated:Connect(function() performTowerAction("Target") end)
 
 events.BPCurrencyClient.OnClientEvent:Connect(function(amount)
 	gui.BpCurrnecy.Text = "BP Currency: " .. amount
@@ -3906,66 +3722,26 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	elseif input.UserInputType == Enum.UserInputType.MouseButton1
 		or input.UserInputType == Enum.UserInputType.Touch
 	then
-		if hoveredModel
-			and hoveredKind == "Tower"
-			and hoveredModel.Parent == InteractiveTowersFolder
-			and hoveredModel:FindFirstChild("Config")
-			and hoveredModel.Config.Health.HealthValue.Value > 0
-		then
-			selectedTower = hoveredModel
-		else
-			selectedTower = nil
-		end
+		local pointer = if input.UserInputType == Enum.UserInputType.Touch then Vector2.new(input.Position.X, input.Position.Y) else UserInputService:GetMouseLocation()
+		if interaction:IsBlocked(pointer) or GameWrapUp then return end
+		local _, _, _, clicked, kind = MouseRaycast(nil, pointer)
+		selectedTower = if kind == "Tower" then clicked else nil
 
 		toggleTowerInfo()
 	end
 
 
+	if UserInputService:GetFocusedTextBox() then return end
 	if input.KeyCode == Enum.KeyCode.E then
-		if selectedTower
-			and selectedTower:FindFirstChild("Config")
-			and selectedTower.Config.Owner.Value == Players.LocalPlayer.Name
-			and selectedTower.Config.Health.HealthValue.Value > 0
-			and hasNextUpgrade(selectedTower)
-		then
-			local upgradeSuccess =
-				upgradeTowerFunction:InvokeServer(selectedTower)
-
-			if upgradeSuccess then
-				gui.Sounds.Upgrade:Play()
-
-				local particle =
-					ReplicatedStorage.Particle.Upgrade:Clone()
-
-				particle.Parent = selectedTower.HumanoidRootPart
-				particle:Emit(10)
-
-				toggleTowerInfo()
-			end
-		end
+		performTowerAction("Upgrade")
 	elseif input.KeyCode == Enum.KeyCode.X then
-		if selectedTower and selectedTower.Config.Owner.Value == Players.LocalPlayer.Name then
-			local soldTower = sellTowerFunction:InvokeServer(selectedTower)
-			local towerName = selectedTower.Name
-
-			if soldTower then
-				selectedTower = nil
-				gui.OtherGameStats.MaxTowersBanner.TextLabel.Text = tostring(placedTowers.Value) .. "/" .. tostring(getPlacement())
-				toggleTowerInfo()
-				gui.Sounds.Upgrade:Play()
-
-			end
-		end
-
+		performTowerAction("Sell")
 	elseif input.KeyCode == Enum.KeyCode.Z then
-		if selectedTower and selectedTower.Config.Owner.Value == Players.LocalPlayer.Name then
-			local targetChangeSuccess = changeModeFunction:InvokeServer(selectedTower)
-			if targetChangeSuccess then
-				toggleTowerInfo()
-			end
-		end
-
-	end	
+		performTowerAction("Target")
+	elseif input.KeyCode == Enum.KeyCode.Escape then
+		selectedTower = nil
+		toggleTowerInfo()
+	end
 
 	local slotIndex = towerSlotKeys[input.KeyCode]
 
@@ -4004,10 +3780,18 @@ local PrevPos = CFrame.new()
 local SWAY_FACTOR = 0.25 -- tweak this to match old feel
 
 RunService.RenderStepped:Connect(function()
+	if selectedTower and (not interaction:Resolve(selectedTower) or GameWrapUp) then
+		selectedTower = nil
+		toggleTowerInfo()
+	end
+	interaction:Update(if not towerToSpawn and not GameWrapUp then hoveredModel else nil, selectedTower)
 	local result, mousePos, blocked = nil, nil, false
 
 	-- If placing a tower
 	if towerToSpawn then
+		hoveredModel, hoveredKind = nil, nil
+		hoverGui.Visible = false; TowerhoverGui.Visible = false; UnitHoverGui.Visible = false
+		ClearUnitRangeCircle()
 		result, mousePos, blocked = PlacementRaycast(towerToSpawn)
 
 
@@ -4151,8 +3935,14 @@ RunService.RenderStepped:Connect(function()
 		local height = towerToSpawn.HipHeight.Value + (towerToSpawn.PrimaryPart.Size.Y / 0.7)
 
 	else
-		result, mousePos, _, hoveredModel, hoveredKind =
-			MouseRaycast(nil)
+		if GameWrapUp then
+			hoveredModel, hoveredKind = nil, nil
+			hoverGui.Visible = false; TowerhoverGui.Visible = false; UnitHoverGui.Visible = false
+			ClearUnitRangeCircle()
+			return
+		end
+		result, mousePos, _, hoveredModel, hoveredKind = MouseRaycast(nil)
+		interaction:Update(hoveredModel, selectedTower)
 
 		hoveredInstance =
 			result
