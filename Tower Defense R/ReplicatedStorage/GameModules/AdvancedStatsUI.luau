@@ -45,10 +45,6 @@ function UI.new(host)
  if not host:FindFirstChildOfClass('UIListLayout') then
   self.HostLayout=create('UIListLayout',host,{SortOrder=Enum.SortOrder.LayoutOrder,Padding=UDim.new(0,8)})
  end
- if host:IsA('ScrollingFrame') then
-  self.PreviousCanvas=host.AutomaticCanvasSize
-  host.AutomaticCanvasSize=Enum.AutomaticSize.Y
- end
  self.Root=create('Frame',host,{Name='AdvancedStats',BackgroundTransparency=1,
   Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,LayoutOrder=1000,Visible=false})
  create('UIListLayout',self.Root,{SortOrder=Enum.SortOrder.LayoutOrder,Padding=UDim.new(0,8)})
@@ -64,7 +60,7 @@ function UI:Clear()
  for _,record in self.Records do
   cancel(record)
   record.Open=false; record.Frame.Visible=false
-  record.Frame.Size=UDim2.new(1,0,0,55); record.Arrow.Rotation=0
+  record.Resize(false); record.Arrow.Rotation=0
  end
  self.Root.Visible=false
 end
@@ -77,20 +73,39 @@ function UI:CreateRecord()
  local body=frame:WaitForChild('Content')
  local layout=assert(body:FindFirstChildOfClass('UIListLayout'),'AdvancedStatsTemplate.Content needs a UIListLayout')
  local record={Frame=frame,Header=header,Arrow=arrow,Body=body,Open=false}
- local function resize()
-  if record.Tween then record.Tween:Cancel() end
-  -- Absolute layout measurements include ancestor UIScale. Convert back to offsets.
+ local closedSize=self.Template.Size
+ local headerSize=header.Size
+ local bodySize=body.Size
+ local bodyPosition=body.Position
+ local bodyAnchor=body.AnchorPoint
+ body.AutomaticSize=Enum.AutomaticSize.None
+ local function scaleFactor(object)
   local factor=1
-  local ancestor=body
-  while ancestor and ancestor:IsA('GuiObject') do
-   local scale=ancestor:FindFirstChildOfClass('UIScale')
+  while object and object:IsA('GuiObject') do
+   local scale=object:FindFirstChildOfClass('UIScale')
    if scale then factor*=scale.Scale end
-   ancestor=ancestor.Parent
+   object=object.Parent
   end
-  local height=55+(if record.Open then layout.AbsoluteContentSize.Y/math.max(factor,0.001)+16 else 0)
-  record.Tween=TweenService:Create(frame,TweenInfo.new(0.25,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),{Size=UDim2.new(1,0,0,height)})
+  return math.max(factor,0.001)
+ end
+ local function resize(animate)
+  if record.Tween then record.Tween:Cancel(); record.Tween=nil end
+  -- Resolve the authored collapsed scale against Main, not the auto-sized root.
+  local closedHeight=self.Host.AbsoluteSize.Y/scaleFactor(self.Host)*closedSize.Y.Scale+closedSize.Y.Offset
+  local headerHeight=closedHeight*headerSize.Y.Scale+headerSize.Y.Offset
+  local contentHeight=layout.AbsoluteContentSize.Y/scaleFactor(body)
+  -- Keep a full-size Toggle at its collapsed height while its parent expands.
+  header.Size=UDim2.new(headerSize.X.Scale,headerSize.X.Offset,0,headerHeight)
+  body.Size=UDim2.new(bodySize.X.Scale,bodySize.X.Offset,0,contentHeight)
+  body.Position=UDim2.new(bodyPosition.X.Scale,bodyPosition.X.Offset,0,headerHeight+contentHeight*bodyAnchor.Y)
+  local height=closedHeight+(if record.Open then contentHeight+16 else 0)
+  local target=UDim2.new(closedSize.X.Scale,closedSize.X.Offset,0,height)
+  if animate==false then frame.Size=target; return end
+  record.Tween=TweenService:Create(frame,TweenInfo.new(0.25,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),{Size=target})
   record.Tween:Play()
  end
+ record.Resize=resize
+ resize(false)
  table.insert(self.Connections,header.Activated:Connect(function()
   record.Open=not record.Open
   if record.ArrowTween then record.ArrowTween:Cancel() end
@@ -98,7 +113,10 @@ function UI:CreateRecord()
   record.ArrowTween:Play(); resize()
  end))
  table.insert(self.Connections,layout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
-  if record.Open and frame.Visible then resize() end
+  if frame.Visible then resize(record.Open) end
+ end))
+ table.insert(self.Connections,self.Host:GetPropertyChangedSignal('AbsoluteSize'):Connect(function()
+  if frame.Visible then resize(false) end
  end))
  return record
 end
@@ -121,6 +139,7 @@ function UI:Render(groups)
    label.Text=item.Text; label.Visible=true
   end
   record.Frame.Visible=true
+  record.Resize(false)
  end
 end
 function UI:ShowLevel(definition,level,identity)
@@ -135,6 +154,5 @@ function UI:Destroy()
  self.Root:Destroy()
  if self.OwnTemplate then self.Template:Destroy() end
  if self.HostLayout then self.HostLayout:Destroy() end
- if self.PreviousCanvas then self.Host.AutomaticCanvasSize=self.PreviousCanvas end
 end
 return UI

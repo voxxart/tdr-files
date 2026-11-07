@@ -16,7 +16,7 @@ end
 local objects=0
 local function node(class)
  objects+=1
- local n={Name=class,Class=class,Children={},Signals={},Activated=signal(),Visible=true,AbsoluteContentSize={Y=100},Scale=1}
+ local n={Name=class,Class=class,Children={},Signals={},Activated=signal(),Visible=true,AnchorPoint={X=0,Y=0},AbsoluteSize={Y=1000},AbsoluteContentSize={Y=100},Scale=1}
  local mt={}
  mt.__index=function(self,key)
   if key=='Parent' then return rawget(self,'_Parent') end
@@ -57,7 +57,7 @@ local env=setmetatable({Instance={new=node},script={Parent={AdvancedStatsData='d
  game={GetService=function() return tweenService end},
  UDim2={new=dim,fromOffset=function(x,y) return dim(0,x,0,y) end},UDim={new=function(a,b) return {Scale=a,Offset=b} end},
  Vector2={new=function(x,y) return {X=x,Y=y} end},Color3={fromRGB=function(...) return {...} end},
- Enum={AutomaticSize={Y=1},SortOrder={LayoutOrder=1},Font={Gotham=1,GothamBold=2},TextXAlignment={Left=1},TextYAlignment={Top=1},EasingStyle={Quart=1,Quad=2},EasingDirection={Out=1}},
+ Enum={AutomaticSize={Y=1,None=0},SortOrder={LayoutOrder=1},Font={Gotham=1,GothamBold=2},TextXAlignment={Left=1},TextYAlignment={Top=1},EasingStyle={Quart=1,Quad=2},EasingDirection={Out=1}},
  TweenInfo={new=function(...) return {...} end}},{__index=getfenv()})
 local data=assert(loadstring(source1))()
 env.require=function(id) assert(id=='data'); return data end
@@ -86,7 +86,23 @@ ui:Destroy(); assert(template.Destroyed and ui.Root.Destroyed and host.Automatic
 for _,c in record.Header.Activated.Callbacks do assert(not c.C.Connected) end
 -- An authored template is reused and kept on cleanup.
 local custom=template:Clone(); custom.Destroyed=nil; custom.Parent=host
+custom.Size=dim(0.924,0,0.095,0)
+custom.Toggle.Size=dim(1,0,1,0)
+custom.Content.AnchorPoint={X=0.5,Y=0.5}
+custom.Content.Position=dim(0.5,0,0.5,0)
+custom.Content.Size=dim(1,0,0,0)
 local reused=UI.new(host); assert(reused.Template==custom and not reused.OwnTemplate)
+assert(host.AutomaticCanvasSize==0,'Main canvas setting must remain authored')
+reused:ShowLevel(def,1,{})
+local scaled=reused.Records[1]
+assert(scaled.Frame.Size.X.Scale==0.924 and scaled.Frame.Size.Y.Offset==95)
+assert(scaled.Header.Size.Y.Offset==95 and scaled.Body.AnchorPoint.Y==0.5)
+assert(scaled.Body.Position.X.Scale==0.5 and scaled.Body.Position.Y.Offset==145)
+scaled.Header.Activated:Fire(); assert(scaled.Tween.Goal.Size.Y.Offset==211)
+assert(scaled.Header.Size.Y.Offset==95,'header must not expand over the content')
+host.AbsoluteSize={Y=800}; host:GetPropertyChangedSignal('AbsoluteSize'):Fire()
+assert(scaled.Header.Size.Y.Offset==76 and scaled.Frame.Size.Y.Offset==192)
+assert(custom.Size.Y.Scale==0.095 and custom.Toggle.Size.Y.Scale==1 and custom.Content.Position.Y.Scale==0.5,'template must remain unchanged')
 reused:Destroy(); assert(not custom.Destroyed)
 -- Server stat merge must ignore level-local display tables.
 local gameModules={CombatProfiles='profiles',WaitForChild=function(_,key) return key end}

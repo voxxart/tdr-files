@@ -8,7 +8,7 @@
 - [ ] Add **ModuleScript** — `ReplicatedStorage.GameModules.AdvancedStatsUI`
 - [ ] Optionally update **ModuleScript** — `ReplicatedStorage.GameModules.TowerData`; its only repository change is a format comment. Keep your own data edits and add groups as below.
 
-No new events or required manual UI objects. The host is the existing **ScrollingFrame** `StarterGui.GameGui.UpgradeUI.Stats.Main`. Its existing layout is retained; a UIListLayout is created only if absent. AutomaticCanvasSize is set to Y so expanded content remains reachable. The script does not change the host's authored Size.
+No new events or required manual UI objects. The host is the existing **ScrollingFrame** `StarterGui.GameGui.UpgradeUI.Stats.Main`. Its existing layout is retained; a UIListLayout is created only if absent. Main's AutomaticCanvasSize, CanvasSize, AutomaticSize, Size, and Position are left unchanged. Configure its scroll range yourself to accommodate expanded groups.
 
 ## TowerData format
 
@@ -42,7 +42,7 @@ A group in `Upgrades[2]` appears while inspecting a placed level 2 tower. It dis
 
 ## Generated UI and custom template
 
-Each closed group is `UDim2.new(1, 0, 0, 55)`. Clicking its header toggles expansion with a 0.25-second easing animation and animated arrow. Height follows visible wrapped text and updates when content layout changes. Groups open independently. Switching towers or levels closes the groups; refreshing the same tower and level preserves open state. Up to ten group frames are pooled and reused instead of recreated on every selection.
+Closed groups use the template's authored width and height. A Y scale is resolved against Main's visible height, so `{0.924, 0}, {0.095, 0}` is supported despite the generated auto-sized container. The fallback template remains 55 pixels tall. Clicking its header toggles expansion with a 0.25-second easing animation and animated arrow. Height follows visible wrapped text and updates when content layout changes. Groups open independently. Switching towers or levels closes the groups; refreshing the same tower and level preserves open state. Up to ten group frames are pooled and reused instead of recreated on every selection.
 
 To keep and customize the generated design:
 
@@ -70,7 +70,7 @@ AdvancedStatsTemplate (Frame; ClipsDescendants = true)
     Nine (TextLabel)
 ```
 
-Keep all nine labels, even for groups with fewer entries. Labels should use TextWrapped=true, AutomaticSize=Y, and a width filling Content. The default content has 14-pixel horizontal inset, 8-pixel row spacing, and 16 pixels below the last item. Changing the fixed 55-pixel header or 16-pixel bottom spacing also requires changing the corresponding values in AdvancedStatsUI. Keep the template a direct child of Main; generated instances live under Main.AdvancedStats.
+Keep all nine labels, even for groups with fewer entries. Labels should use TextWrapped=true, AutomaticSize=Y, and a width filling Content. The default content has 14-pixel horizontal inset, 8-pixel row spacing, and 16 pixels below the last item. The live copy resolves Toggle height from its authored size at the closed height, so a full-size `{1, 0}, {1, 0}` Toggle stays confined to the header during expansion. Content keeps its authored X position, width, and anchor; its live Y position and height are calculated to fit below the header. A centered Content anchor of `0.5, 0.5` is supported. The saved template is not modified. The 16-pixel bottom spacing is configured in AdvancedStatsUI. Keep the template a direct child of Main; generated instances live under Main.AdvancedStats.
 
 The saved template is used at startup; edit outside Play and restart to preview changes. The template is never edited or destroyed by normal selection changes. If no template is supplied, a default is generated once per controller lifetime.
 
@@ -78,7 +78,7 @@ The saved template is used at startup; edit outside Play and restart to preview 
 
 - [ ] Add one group at one level; verify it appears only at that current level, including at max level.
 - [ ] Test several groups, including AdvancedStats10, and all nine strings. Verify numeric group and One–Nine text order.
-- [ ] Test missing entries and long wrapping text at different resolutions and UI scales. Confirm no clipped last row and sufficient scroll range.
+- [ ] Test missing entries and long wrapping text at different resolutions and UI scales. Confirm no clipped last row and sufficient manually configured scroll range. Confirm Main canvas settings remain unchanged.
 - [ ] Open several groups independently, close them, and click repeatedly mid-animation.
 - [ ] Upgrade, switch towers, sell, and remove the selected tower. Verify no stale groups and no accumulating frames/connections.
 - [ ] Test mouse, touch, and gamepad activation of the header; clicking UI must not select towers behind it.
