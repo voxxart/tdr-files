@@ -60,6 +60,9 @@ local hoveredKind = nil
 
 
 
+local slotAnimator = require(ReplicatedStorage.GameModules:WaitForChild("PlacementSlotAnimator")).new()
+script.Destroying:Connect(function() slotAnimator:Destroy() end)
+
 local placementRequestSerial = 0
 
 local function beginPlacementRequest()
@@ -68,7 +71,7 @@ local function beginPlacementRequest()
 end
 
 local function placementRequestIsCurrent(requestSerial)
-	return requestSerial == placementRequestSerial
+	return requestSerial == placementRequestSerial and not GameWrapUp
 end
 
 
@@ -1259,6 +1262,7 @@ local function RemovePlaceholderTower(cancelPendingRequests)
 	-- from one valid preview to another.
 	if cancelPendingRequests ~= false then
 		placementRequestSerial += 1
+		slotAnimator:Select(nil)
 	end
 
 	canPlace = false
@@ -1306,7 +1310,7 @@ local function RemovePlaceholderTower(cancelPendingRequests)
 end
 
 
-local function AddPlaceholderTower(towerName, requestSerial, suppliedPlayerData)
+local function AddPlaceholderTower(towerName, requestSerial, suppliedPlayerData, slotIndex)
 	-- Direct callers are still supported.
 	if requestSerial == nil then
 		requestSerial = beginPlacementRequest()
@@ -1393,6 +1397,7 @@ local function AddPlaceholderTower(towerName, requestSerial, suppliedPlayerData)
 	end
 
 	if not towerToSpawn.PrimaryPart then
+		slotAnimator:Select(nil)
 		warn("Tower appearance has no PrimaryPart:", towerName, appearanceName)
 		towerToSpawn:Destroy()
 		towerToSpawn = nil
@@ -1457,9 +1462,10 @@ local function AddPlaceholderTower(towerName, requestSerial, suppliedPlayerData)
 	end
 
 	gui.DesktopControls.Visible = true
+	slotAnimator:Select(slotIndex)
 end
 
-local function requestPlacementForTower(towerName, requestSerial, playerData)
+local function requestPlacementForTower(towerName, requestSerial, playerData, slotIndex)
 	if not towerName then
 		return
 	end
@@ -1478,7 +1484,8 @@ local function requestPlacementForTower(towerName, requestSerial, playerData)
 		AddPlaceholderTower(
 			towerName,
 			requestSerial,
-			playerData
+			playerData,
+			slotIndex
 		)
 	end
 end
@@ -1510,7 +1517,8 @@ local function requestPlacementSlot(slotIndex)
 	requestPlacementForTower(
 		towerName,
 		requestSerial,
-		playerData
+		playerData,
+		slotIndex
 	)
 end
 
@@ -2638,6 +2646,8 @@ local function spawnNewTower()
 	local _, y, _ = targetCFrame:ToOrientation()
 	local cleanCFrame = CFrame.new(pos) * CFrame.Angles(0, y, 0)
 
+	local placedRequestSerial = placementRequestSerial
+
 	-- Spawn tower on server
 	local placedtower = spawnTowerFunction:InvokeServer(
 		getCanonicalTowerName(towerToSpawn),
@@ -2683,7 +2693,7 @@ local function spawnNewTower()
 	-- =========================
 	-- 📦 BOX / VISUAL LOGIC
 	-- =========================
-	RemovePlaceholderTower()
+	if placementRequestIsCurrent(placedRequestSerial) then RemovePlaceholderTower() end
 	toggleTowerInfo()
 
 	if placedtower.Config.Owner.Value == Players.LocalPlayer.Name and not placedtower.Config:FindFirstChild("Flying") then
@@ -3780,6 +3790,7 @@ local PrevPos = CFrame.new()
 local SWAY_FACTOR = 0.25 -- tweak this to match old feel
 
 RunService.RenderStepped:Connect(function()
+	if GameWrapUp and towerToSpawn then RemovePlaceholderTower() end
 	if selectedTower and (not interaction:Resolve(selectedTower) or GameWrapUp) then
 		selectedTower = nil
 		toggleTowerInfo()
@@ -5225,6 +5236,7 @@ local function SetupGameGui()
 				------------------------------------------------
 
 				button.Visible = true
+				slotAnimator:Register(i, button)
 
 				------------------------------------------------
 				-- BUTTON CLICK
@@ -5237,7 +5249,9 @@ local function SetupGameGui()
 
 					requestPlacementForTower(
 						tower,
-						requestSerial
+						requestSerial,
+						nil,
+						i
 					)
 				end)
 
