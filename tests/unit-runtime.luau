@@ -1,0 +1,11 @@
+local Runtime = require('../Tower Defense R/ServerScriptService/UnitSystem/Runtime')
+local a,b,c={},{},{}
+local first=Runtime.Add(a,{Generation=1})
+Runtime.Add(b,{}); local third=Runtime.Add(c,{})
+assert(Runtime.Add(a,{})==first and #Runtime.List()==3)
+Runtime.Remove(b)
+assert(#Runtime.List()==2 and third.Index==2 and Runtime.Get(b)==nil)
+assert(Runtime.Remove(b)==nil)
+Runtime.Remove(a); Runtime.Remove(c)
+assert(#Runtime.List()==0 and first.Cleaned and third.Cleaned)
+print('Unit runtime checks passed: duplicate registration, dense removal, idempotent cleanup')

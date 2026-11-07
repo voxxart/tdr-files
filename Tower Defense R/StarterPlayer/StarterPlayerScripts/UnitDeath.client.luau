@@ -21,9 +21,10 @@ local UnitDeath = Events:WaitForChild("UnitDeath")
 local Units = Workspace:WaitForChild("Units")
 local UnitTemplates = ReplicatedStorage:WaitForChild("Units")
 local GameSpeed = Workspace:WaitForChild("Info"):WaitForChild("GameSpeed")
+local Definitions = require(ReplicatedStorage.GameModules.UnitDefinitions)
 
 local function speed()
-	return math.max(GameSpeed.Value, 0.05)
+	return math.max(GameSpeed.Value, 0)
 end
 
 -- Proactively preload optional Death animation assets on existing/future units.
@@ -32,7 +33,8 @@ local function warmTemplate(template)
 	task.spawn(function()
 		local effects = template:FindFirstChild("DeathEffects")
 		local animations = effects and effects:FindFirstChild("Animations")
-		local animation = animations and animations:FindFirstChild("Death")
+		local profile=(Definitions.Units[template.Name] or {}).Death or {}
+		local animation = animations and animations:FindFirstChild(profile.Animation or 'Death')
 		if animation and animation:IsA("Animation") and animation.AnimationId ~= ""
 			and not warmed[animation.AnimationId] then
 			warmed[animation.AnimationId] = true
@@ -44,6 +46,17 @@ end
 for _, template in ipairs(UnitTemplates:GetChildren()) do warmTemplate(template) end
 UnitTemplates.ChildAdded:Connect(warmTemplate)
 
+local deathTracks = {}
+GameSpeed.Changed:Connect(function()
+	for model,track in pairs(deathTracks) do
+		if model.Parent then track:AdjustSpeed(speed()) else deathTracks[model]=nil; track:Destroy() end
+	end
+end)
+Units.ChildRemoved:Connect(function(model)
+	local track=deathTracks[model]
+	deathTracks[model]=nil
+	if track then track:Stop(0); track:Destroy() end
+end)
 local processed = setmetatable({}, {__mode = "k"})
 local watched = setmetatable({}, {__mode = "k"})
 
@@ -134,8 +147,9 @@ local function startDeath(model, deathCFrame)
 
 		local animFolder = effects:FindFirstChild("Animations")
 			or effects:WaitForChild("Animations", 0.75)
-		local animation = animFolder and (animFolder:FindFirstChild("Death")
-			or animFolder:WaitForChild("Death", 0.75))
+		local animationName = model:GetAttribute('UnitDeathAnimation') or 'Death'
+		local animation = animFolder and (animFolder:FindFirstChild(animationName)
+			or animFolder:WaitForChild(animationName, 0.75))
 
 		if not (animation and animation:IsA("Animation")) then
 			warn("[UnitDeath] Missing DeathEffects.Animations.Death (Animation) for", model.Name)
@@ -163,6 +177,7 @@ local function startDeath(model, deathCFrame)
 			return
 		end
 
+		deathTracks[model]=track
 		track.Name = "UnitDeath_Death"
 		track.Looped = false
 		track.Priority = Enum.AnimationPriority.Action4
