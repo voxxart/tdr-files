@@ -1,3 +1,7 @@
+-- Optional display-only groups belong directly on a tower definition (level 0)
+-- or its exact Upgrades[level] table. They do not carry into later levels.
+-- AdvancedStats1 = {Title = "Abilities", One = "First detail", Two = "Second detail"},
+-- Supports AdvancedStats1..AdvancedStats10 and One..Nine (or ordered string arrays).
 return {
 	Settings = {
 		SellPercent = 0.5,

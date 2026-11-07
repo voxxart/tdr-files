@@ -20,6 +20,7 @@ local RESERVED = {
 	Name = true,
 	UpgradeName = true,
 }
+for index=1,10 do RESERVED["AdvancedStats"..index]=true end
 
 local function cloneDictionary(source)
 	local out = {}

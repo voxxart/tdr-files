@@ -38,6 +38,8 @@ local hoverGui = gui.MobHoverGui
 local UnitHoverGui = gui.UnitHoverGui
 local TowerhoverGui = gui.TowerHoverGui
 local upgradeGui = gui.UpgradeUI
+local advancedStatsUI = require(ReplicatedStorage.GameModules:WaitForChild("AdvancedStatsUI")).new(upgradeGui.Stats.Main)
+script.Destroying:Connect(function() advancedStatsUI:Destroy() end)
 local info = workspace:WaitForChild("Info")
 
 hoverGui.Active = false
@@ -103,6 +105,7 @@ local RESERVED_UPGRADE_KEYS = {
 	Name = true,
 	UpgradeName = true,
 }
+for index=1,10 do RESERVED_UPGRADE_KEYS["AdvancedStats"..index]=true end
 
 local function getCanonicalTowerName(model)
 	if not model then return nil end
@@ -1708,7 +1711,11 @@ local function refreshReaperRequirementLabels(model)
 end
 
 local currentSelectionId = 0
+local function refreshAdvancedStats(tower)
+	advancedStatsUI:ShowLevel(getTowerDefinition(getCanonicalTowerName(tower)), getTowerLevel(tower), tower)
+end
 local function toggleTowerInfo()
+	if selectedTower then refreshAdvancedStats(selectedTower) else advancedStatsUI:Clear() end
 	clearSelectedRange()
 	interaction:Update(hoveredModel, selectedTower)
 	gui.OtherGameStats.MaxTowersBanner.TextLabel.Text = tostring(placedTowers.Value) .. "/" .. tostring(getPlacement())
@@ -1790,6 +1797,7 @@ local function toggleTowerInfo()
 					then
 						updateUpgradeLevelDisplay(selectedForLevelUI)
 						updateOwnerBoxColor(selectedForLevelUI)
+						refreshAdvancedStats(selectedForLevelUI)
 					end
 				end)
 		end
@@ -1803,6 +1811,7 @@ local function toggleTowerInfo()
 				then
 					updateUpgradeLevelDisplay(selectedForLevelUI)
 					updateOwnerBoxColor(selectedForLevelUI)
+						refreshAdvancedStats(selectedForLevelUI)
 				end
 			end)
 
