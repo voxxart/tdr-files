@@ -203,7 +203,7 @@ local function doAirStrike(enemy, state)
 		end
 
 		-- Play animation and notify clients for visuals only
-		local anim = enemy.scope:Own(AnimationController:LoadAnimation(enemy.Animations.Summon))
+		local anim = scope:Own(enemy.AnimationController:LoadAnimation(enemy.Animations.Summon))
 		scope:Play(anim)
 
 		local talk = enemy:FindFirstChild("HumanoidRootPart") and enemy.HumanoidRootPart:FindFirstChild("Talking")
@@ -366,7 +366,7 @@ local function doSummon(enemy, state)
 	state.nextSummon = Match.Now() + (COOLDOWNS.Summon)
 
 	runAbility(enemy, state, "Summon", 1.5, false, function()
-		local anim = enemy.scope:Own(AnimationController:LoadAnimation(enemy.Animations.Summon))
+		local anim = scope:Own(enemy.AnimationController:LoadAnimation(enemy.Animations.Summon))
 		scope:Play(anim)
 
 		local hrp = enemy:FindFirstChild("HumanoidRootPart")
