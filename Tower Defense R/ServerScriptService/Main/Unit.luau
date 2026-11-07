@@ -986,7 +986,7 @@ end
 --------------------------------------------------------------------------------
 -- Spawn
 --------------------------------------------------------------------------------
-function unit.Spawn(name, quantity, cooldown, healthMultiplier, speedMultiplier, map, ownerTower)
+function unit.Spawn(name, quantity, cooldown, healthMultiplier, speedMultiplier, map, ownerTower, canContinue)
 	local unitExists = RepStorage.Units:FindFirstChild(name)
 	if not unitExists then
 		warn("No unit found with name:", name)
@@ -1004,6 +1004,7 @@ function unit.Spawn(name, quantity, cooldown, healthMultiplier, speedMultiplier,
 
 	for i = 1, quantity do
 		task.wait(cooldown / getGS())
+		if canContinue and not canContinue() then return end
 
 		if info.Message.Value == "GAME OVER" then
 			return

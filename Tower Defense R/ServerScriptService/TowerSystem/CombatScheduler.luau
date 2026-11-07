@@ -25,6 +25,7 @@ function Scheduler:Step()
 		if not model.Parent or not config or not config.Parent or not Match.IsCurrent(data.MatchGeneration) then
 			data.burstGen = (data.burstGen or 0) + 1
 			context.Projectiles.Cancel(model)
+			if data.isPhaser and context.Phaser then context.Phaser.Cancel(model,data) end
 			towers[model] = nil
 			continue
 		end
@@ -45,11 +46,11 @@ function Scheduler:Step()
 		local stunnedUntil = config:GetAttribute('StunnedUntil')
 		if stunnedUntil and wall < stunnedUntil then continue end
 		if data.isPhaser then
-			-- Keep its authored phase machine on its legacy wall-time contract.
+			-- Phaser phase, shot and ramp deadlines share game time with normal combat.
 			if not data.phaserBusy then
 				data.phaserBusy = true
 				task.spawn(function()
-					local ok, err = pcall(tower.PhaserTick, model, data, wall)
+					local ok, err = pcall(tower.PhaserTick, model, data, now)
 					data.phaserBusy = false
 					if not ok then report(model,'phaser',err) end
 				end)

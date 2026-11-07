@@ -72,4 +72,12 @@ function Targeting.Find(model, range, mode)
 	end)
 	return target
 end
+function Targeting.Visit(position, range, callback)
+	refresh()
+	grid:Visit(position.X,position.Z,range,function(model)
+		local runtime = candidates[model]
+		if runtime and not runtime.Dead and not runtime.Cleaned and model.Parent == Mobs
+			and runtime.HealthValue.Value > 0 then callback(model) end
+	end)
+end
 return Targeting

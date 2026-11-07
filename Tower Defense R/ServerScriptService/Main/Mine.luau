@@ -1,3 +1,5 @@
+local Targeting = require(game.ServerScriptService.TowerSystem.Targeting)
+local Match = require(game.ServerScriptService.Simulation.MatchService)
 --// mine MODULE — stationary proximity mines
 --// Placed by MineLayer towers; explode independently on proximity —
 --// each mine only cares about mobs within its own TriggerRange, so a
@@ -30,6 +32,21 @@ local math_round = math.round
 local math_sqrt  = math.sqrt
 
 local mine = {}
+local ActiveMines = {}
+RunService.Heartbeat:Connect(function(dt)
+	for model, entry in pairs(ActiveMines) do
+		if not model.Parent or not Match.IsCurrent(entry.Generation) then
+			entry.Cleanup()
+			if model.Parent then model:Destroy() end
+		elseif GameSpeedValue.Value > 0 then
+			local ok, err = pcall(entry.Update,dt * GameSpeedValue.Value)
+			if not ok then
+				warn('Mine update failed:',model.Name,err)
+				entry.Cleanup(); model:Destroy()
+			end
+		end
+	end
+end)
 
 local function getGameSpeed()
 	local v = GameSpeedValue and GameSpeedValue.Value or 1
@@ -89,6 +106,8 @@ function mine.Spawn(name, position, ownerTower, ownerConfig, currentMinesValue, 
 		end
 	end
 
+	local generation = Match.Capture()
+	if not Match.IsCurrent(generation) then decrement(); return end
 	local mineTemplate = RepStorage.Mines:FindFirstChild(name)
 	if not mineTemplate then
 		warn("[Mine] No mine template found in ReplicatedStorage.Mines named:", name)
@@ -165,12 +184,11 @@ function mine.Spawn(name, position, ownerTower, ownerConfig, currentMinesValue, 
 	local lifetime      = (stats:FindFirstChild("Lifetime") and stats.Lifetime.Value) or 15
 
 	local removed = false
-	local triggerConn
 
 	local function cleanup()
 		if removed then return end
 		removed = true
-		if triggerConn then triggerConn:Disconnect(); triggerConn = nil end
+		ActiveMines[newMine] = nil
 		decrement()
 	end
 
@@ -251,25 +269,25 @@ function mine.Spawn(name, position, ownerTower, ownerConfig, currentMinesValue, 
 		if newMine and newMine.Parent then newMine:Destroy() end
 	end
 
-	-- Proximity trigger: any mob within TRIGGER_RANGE (horizontal only)
-	-- detonates THIS mine only. Mines never trigger each other — if a
-	-- mob steps within range of several mines at once, each one
-	-- independently detects it on this same Heartbeat and explodes on
-	-- its own, which is the "sets off every one it steps on" behavior.
-	triggerConn = RunService.Heartbeat:Connect(function()
+	-- The shared mine manager checks each mine independently. Adjacent mines
+	-- can all detonate on the same mob; they do not trigger one another.
+	local function checkTrigger()
 		if removed or not newMine.Parent then
-			if triggerConn then triggerConn:Disconnect(); triggerConn = nil end
-			return
+				return
 		end
 		local hbPos = hitbox.Position
-		for mob in pairs(MobSet) do
+		local triggered = false
+		Targeting.Visit(hbPos,TRIGGER_RANGE,function(mob)
+			if triggered then return end
 			local mHit = mob:FindFirstChild("Hitbox")
-			if mHit and horizontalDistance(mHit.Position, hbPos) <= TRIGGER_RANGE and not mob.EnemyStats:FindFirstChild("Flying") then
+			local stats = mob:FindFirstChild("EnemyStats")
+			if mHit and stats and horizontalDistance(mHit.Position,hbPos) <= TRIGGER_RANGE
+				and not stats:FindFirstChild("Flying") then
+				triggered = true
 				explode()
-				return
 			end
-		end
-	end)
+		end)
+	end
 
 	-- Lifetime expiry + visual countdown bar.
 	-- Reuses the SAME 0.2s tick loop for both jobs — no extra Heartbeat/RenderStepped
@@ -282,25 +300,21 @@ function mine.Spawn(name, position, ownerTower, ownerConfig, currentMinesValue, 
 		fill.Size = UDim2.new(1, 0, 1, 0)
 	end
 
-	task_spawn(function()
-		local elapsed = 0
-		while newMine.Parent and not removed do
-			task_wait(0.2)
-			elapsed += 0.2 * getGameSpeed()
-
-			if fill then
-				fill.Size = UDim2.new(math_max(0, 1 - elapsed / lifetime), 0, 1, 0)
+	local elapsed, uiElapsed = 0, 0
+	ActiveMines[newMine] = {
+		Generation = generation, Cleanup = cleanup,
+		Update = function(gameDt)
+			checkTrigger()
+			if removed then return end
+			elapsed += gameDt; uiElapsed += gameDt
+			if fill and fill.Parent and uiElapsed >= 0.2 then
+				uiElapsed = 0
+				fill.Size = UDim2.new(math_max(0, 1-elapsed/lifetime),0,1,0)
 			end
+			if elapsed >= lifetime then cleanup(); newMine:Destroy() end
+		end,
+	}
 
-			if elapsed >= lifetime then
-				cleanup()
-				if newMine and newMine.Parent then newMine:Destroy() end
-				break
-			end
-		end
-	end)
-
-	newMine.Destroying:Connect(cleanup)
 end
 
 return mine
