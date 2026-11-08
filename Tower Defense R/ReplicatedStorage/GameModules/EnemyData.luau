@@ -26,8 +26,19 @@ return {
 		-- Set to 0 after tower targeting is migrated to EnemyRuntime.
 		AlphaMirrorHz = 5,
 
-		-- ONE compressed sync packet for every enemy at this rate.
+		-- Bounded compressed sync packets at this rate.
 		ClientSyncHz = 5,
+		SyncPacketBytes = 900,
+		SpawnBudgetPerFrame = 32,
+		-- Visual rates only; authoritative movement/attacks are unchanged.
+		NearRenderDistance = 120,
+		FarRenderDistance = 260,
+		NearRenderHz = 60,
+		MidRenderHz = 30,
+		FarRenderHz = 10,
+		RegistrationBudget = 64,
+		RegistrationTimeout = 10,
+		SummonEffectsPerFrame = 8,
 
 		BurnTick = 1,
 		BleedTick = 1,

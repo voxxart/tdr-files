@@ -1,9 +1,9 @@
 -- ServerScriptService/EnemySystem/EnemyService.lua
--- Maximum-performance compatibility version.
+-- Shared enemy simulation with bounded replication and legacy compatibility.
 --
 -- Biggest differences from the previous version:
 --   * NO CorrectMob remote fired once per enemy.
---   * ONE compressed EnemySync packet for every enemy.
+--   * Compressed EnemySync packets bounded below the unreliable payload limit.
 --   * NO repeated Bezier evaluation during movement.
 --   * ONE server scheduler.
 --   * ONE BulkMoveTo call per server position tick.
@@ -14,7 +14,6 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 local EnemyData = require(ReplicatedStorage.GameModules:WaitForChild("EnemyData"))
@@ -24,6 +23,8 @@ local EnemyPaths = require(script.Parent:WaitForChild("EnemyPaths"))
 local EnemyFlags = require(script.Parent:WaitForChild("EnemyFlags"))
 local EnemyEffects = require(script.Parent:WaitForChild("EnemyEffects"))
 local EnemyDamage = require(script.Parent:WaitForChild("EnemyDamage"))
+local LegacyEffects = require(script.Parent.LegacyEffects)
+local SyncCodec = require(ReplicatedStorage.GameModules.EnemySyncCodec)
 
 local TowerDeath = require(game.ServerScriptService.Main:WaitForChild("TowerDeath"))
 
@@ -102,12 +103,12 @@ local GameSpeed = GameSpeedValue and GameSpeedValue.Value or 1
 
 if GameSpeedValue then
 	GameSpeedValue:GetPropertyChangedSignal("Value"):Connect(function()
-		GameSpeed = GameSpeedValue.Value ~= 0 and GameSpeedValue.Value or 1
+		GameSpeed = math.max(GameSpeedValue.Value, 0)
 	end)
 end
 
 local function getGameSpeed()
-	return math.max(GameSpeed, 0.0001)
+	return math.max(GameSpeed, 0)
 end
 
 local function incrementEnemyCount()
@@ -215,80 +216,7 @@ local function createCompatibilityEffects(model)
 end
 
 local function bindCompatibility(runtime)
-	local model = runtime.Model
-
-	-- Health and Speed compatibility are intentionally NOT connected here.
-	-- The shared Heartbeat reads those two legacy Values for every enemy.
-	-- That guarantees legacy tower damage cannot leave a 0-HP enemy alive,
-	-- while also saving two RBXScriptConnections per enemy.
-
-	local effects = createCompatibilityEffects(model)
-
-	local burnTime = effects:FindFirstChild("BurnTime")
-	local fireDamage = effects:FindFirstChild("FireDamage")
-
-	if burnTime and fireDamage then
-		table.insert(
-			runtime.Connections,
-			burnTime:GetPropertyChangedSignal("Value"):Connect(function()
-				if runtime.Dead or burnTime.Value <= 0 then
-					return
-				end
-
-				EnemyEffects.ApplyBurn(
-					runtime,
-					burnTime.Value,
-					fireDamage.Value
-				)
-
-				burnTime.Value = 0
-			end)
-		)
-	end
-
-	local bleedTime = effects:FindFirstChild("BleedTime")
-	local bleedDamage = effects:FindFirstChild("BleedDamage")
-	local bleedMultiplier = effects:FindFirstChild("BleedMultiplier")
-
-	if bleedTime and bleedDamage and bleedMultiplier then
-		table.insert(
-			runtime.Connections,
-			bleedTime:GetPropertyChangedSignal("Value"):Connect(function()
-				if runtime.Dead or bleedTime.Value <= 0 then
-					return
-				end
-
-				EnemyEffects.ApplyBleed(
-					runtime,
-					bleedTime.Value,
-					bleedDamage.Value,
-					bleedMultiplier.Value
-				)
-
-				bleedTime.Value = 0
-			end)
-		)
-	end
-
-	local stunTime = effects:FindFirstChild("StunTime")
-
-	if stunTime then
-		table.insert(
-			runtime.Connections,
-			stunTime:GetPropertyChangedSignal("Value"):Connect(function()
-				if runtime.Dead or stunTime.Value <= 0 then
-					return
-				end
-
-				EnemyEffects.ApplyStun(
-					runtime,
-					stunTime.Value
-				)
-
-				stunTime.Value = 0
-			end)
-		)
-	end
+	LegacyEffects.Bind(runtime, createCompatibilityEffects(runtime.Model))
 end
 
 local function calculateBaseStats(template, healthMultiplier, speedMultiplier)
@@ -618,8 +546,8 @@ function EnemyService.Explode(runtimeOrModel, radius)
 					)
 				end
 
-				task.delay(
-					0.5 / getGameSpeed(),
+				Match.After(
+					runtime.MatchGeneration, 0.5,
 					function()
 						if tower and tower.Parent then
 							TowerDeath.KillTower(
@@ -746,6 +674,9 @@ local function registerEnemy(model, map, pathData, options)
 
 	model:SetAttribute("EnemyId", runtime.Id)
 	model:SetAttribute("PathId", runtime.PathId)
+	model:SetAttribute("EnemyHeight", runtime.Height)
+	model:SetAttribute("EnemyOffsetX", runtime.OffsetX)
+	model:SetAttribute("EnemyOffsetZ", runtime.OffsetZ)
 
 	applyDeathWish(runtime)
 	bindCompatibility(runtime)
@@ -782,6 +713,19 @@ local function registerEnemy(model, map, pathData, options)
 	return runtime
 end
 
+-- Shared across regular waves, arrows, and summons; yield before cloning a rig.
+local spawnsThisFrame = 0
+local function claimSpawn(generation, canContinue)
+	local limit = math.max(1, Settings.SpawnBudgetPerFrame or 32)
+	while Match.IsCurrent(generation) and (spawnsThisFrame >= limit or getGameSpeed() <= 0) do
+		if canContinue and not canContinue() then return false end
+		RunService.Heartbeat:Wait()
+	end
+	if not Match.IsCurrent(generation) or (canContinue and not canContinue()) then return false end
+	spawnsThisFrame += 1
+	return true
+end
+
 function EnemyService.Spawn(name, quantity, cooldown, healthMultiplier, speedMultiplier, map)
 	local generation = Match.Capture()
 	if not Match.IsCurrent(generation) then return end
@@ -813,6 +757,7 @@ function EnemyService.Spawn(name, quantity, cooldown, healthMultiplier, speedMul
 			return
 		end
 
+		if not claimSpawn(generation) then return end
 		registerEnemy(
 			template:Clone(),
 			map,
@@ -845,6 +790,7 @@ function EnemyService.ArrowSpawn(name, quantity, cooldown, healthMultiplier, spe
 		local pathData = EnemyPaths.GetRandomPath(map)
 		if not pathData then return end
 
+		if not claimSpawn(generation) then return end
 		registerEnemy(
 			template:Clone(),
 			map,
@@ -1066,6 +1012,7 @@ function EnemyService.Summon(
 				* 100
 			)
 
+		if not claimSpawn(generation, canContinue) then return end
 		registerEnemy(
 			template:Clone(),
 			map,
@@ -1182,47 +1129,20 @@ local function mirrorAlphaValues()
 	end
 end
 
-local function sendCompressedSync(now)
-	local active = EnemyRuntime.GetActiveList()
-	local count = #active
-
-	if count == 0 then
-		return
-	end
-
-	-- Header: u16 count
-	-- Record: u32 enemyId + u16 alpha + i16 effectiveSpeed*100
-	-- 8 bytes / enemy.
-	local recordSize = 8
-	local packet = buffer.create(2 + count * recordSize)
-
-	buffer.writeu16(packet, 0, count)
-
-	local offset = 2
-
-	for i = 1, count do
-		local runtime = active[i]
-
-		local alphaQ = math.clamp(
-			math.round(runtime.Alpha * 65535),
-			0,
-			65535
-		)
-
-		local speedQ = math.clamp(
-			math.round(effectiveSpeed(runtime, now) * 100),
-			-32768,
-			32767
-		)
-
-		buffer.writeu32(packet, offset, runtime.Id)
-		buffer.writeu16(packet, offset + 4, alphaQ)
-		buffer.writei16(packet, offset + 6, speedQ)
-
-		offset += recordSize
-	end
-
+local syncSequence = 0
+local lastSyncPackets, lastSyncBytes = 0, 0
+local function sendSyncPacket(packet)
+	lastSyncPackets += 1; lastSyncBytes += buffer.len(packet)
 	EnemySync:FireAllClients(packet)
+end
+local function syncSpeed(runtime) return effectiveSpeed(runtime, Match.Now()) end
+local function sendCompressedSync()
+	lastSyncPackets, lastSyncBytes = 0, 0
+	syncSequence = (syncSequence + 1) % 4294967296
+	SyncCodec.Encode(EnemyRuntime.GetActiveList(), syncSequence, Workspace:GetServerTimeNow(), syncSpeed, sendSyncPacket, Settings.SyncPacketBytes)
+end
+local function applyEffectDamage(enemy, amount, damageType)
+	EnemyService.Damage(enemy, amount, damageType)
 end
 
 local positionAccumulator = 0
@@ -1236,7 +1156,8 @@ function EnemyService.Start()
 	end
 
 	heartbeatConnection = RunService.Heartbeat:Connect(function(dt)
-		local now = os.clock()
+		spawnsThisFrame = 0
+		local now = Match.Now()
 		local gameSpeed = getGameSpeed()
 		local active = EnemyRuntime.GetActiveList()
 
@@ -1297,17 +1218,10 @@ function EnemyService.Start()
 				runtime.Speed = speedValue.Value
 			end
 
-			EnemyEffects.Update(
-				runtime,
-				now,
-				function(enemy, amount, damageType)
-					EnemyService.Damage(
-						enemy,
-						amount,
-						damageType
-					)
-				end
-			)
+			LegacyEffects.Poll(runtime, now)
+			if gameSpeed > 0 and (runtime.BurnUntil > 0 or runtime.BleedUntil > 0) then
+				EnemyEffects.Update(runtime, now, applyEffectDamage)
+			end
 
 			if runtime.Dead then
 				continue
@@ -1330,7 +1244,7 @@ function EnemyService.Start()
 					/ runtime.PathLength
 			end
 
-			if runtime.Alpha >= 1 then
+			if gameSpeed > 0 and runtime.Alpha >= 1 then
 				runtime.Alpha = 1
 				reachBase(runtime)
 			end
@@ -1352,9 +1266,18 @@ function EnemyService.Start()
 
 		if syncAccumulator >= CLIENT_SYNC_INTERVAL then
 			syncAccumulator %= CLIENT_SYNC_INTERVAL
-			sendCompressedSync(now)
+			sendCompressedSync()
 		end
 	end)
+end
+
+function EnemyService.GetDiagnostics()
+	return {
+		ActiveEnemies = #EnemyRuntime.GetActiveList(),
+		LastSyncPackets = lastSyncPackets, LastSyncBytesPerClient = lastSyncBytes,
+		LastMovedHitboxes = previousBulkCount,
+		LegacyEffectConnectionsPerEnemy = 0,
+	}
 end
 
 function EnemyService.Stop()
@@ -1362,6 +1285,8 @@ function EnemyService.Stop()
 		heartbeatConnection:Disconnect()
 		heartbeatConnection = nil
 	end
+	table.clear(bulkParts); table.clear(bulkCFrames); previousBulkCount = 0
+	positionAccumulator, syncAccumulator, alphaAccumulator = 0, 0, 0
 end
 
 EnemyService.Start()

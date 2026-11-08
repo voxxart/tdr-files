@@ -10,6 +10,10 @@ local RunService = game:GetService('RunService')
 local frame = 0
 RunService.Heartbeat:Connect(function() frame += 1 end)
 local Targeting = {}
+-- Reclaim index references immediately, even if no tower queries after match end.
+Mobs.ChildRemoved:Connect(function(model)
+	candidates[model] = nil; seen[model] = nil; grid:Remove(model)
+end)
 local function refresh()
 	-- Rebuild once per Heartbeat on demand, shared by every tower query.
 	if lastFrame == frame then return end

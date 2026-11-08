@@ -1,10 +1,10 @@
 -- StarterPlayerScripts/EnemyRenderer.client.lua
--- Maximum-performance renderer:
+-- Shared renderer with bounded sync, spawn recovery, and distance update rates.
 --   * one PreRender connection
 --   * sampled paths
 --   * dense arrays
 --   * one BulkMoveTo call per frame
---   * one compressed sync packet for ALL enemies
+--   * bounded timestamped sync packets; stale records rejected
 --   * no per-enemy render coroutine
 --   * no per-enemy cleanup connection
 
@@ -15,6 +15,7 @@ local Workspace = game:GetService("Workspace")
 
 local BezierPath = require(ReplicatedStorage.Modules:WaitForChild("BezierPath"))
 local EnemyData = require(ReplicatedStorage.GameModules:WaitForChild("EnemyData"))
+local SyncCodec = require(ReplicatedStorage.GameModules:WaitForChild("EnemySyncCodec"))
 
 local Settings = EnemyData.Settings
 local SAMPLE_COUNT = Settings.PathSampleCount or 512
@@ -27,17 +28,15 @@ local EnemySync = Events:WaitForChild("EnemySync")
 local Info = Workspace:WaitForChild("Info")
 local GameSpeedValue = Info:WaitForChild("GameSpeed")
 
-local gameSpeed =
-	GameSpeedValue.Value ~= 0
-	and GameSpeedValue.Value
-	or 1
-
+local gameSpeed = math.max(GameSpeedValue.Value, 0)
 GameSpeedValue:GetPropertyChangedSignal("Value"):Connect(function()
-	gameSpeed =
-		GameSpeedValue.Value ~= 0
-		and GameSpeedValue.Value
-		or 1
+	gameSpeed = math.max(GameSpeedValue.Value, 0)
 end)
+local visualGameTime = 0
+local summonEffectsBudget = Settings.SummonEffectsPerFrame or 8
+local function running()
+	return Info.GameRunning.Value and Info.Message.Value ~= 'VICTORY' and Info.Message.Value ~= 'GAME OVER'
+end
 
 local MobsFolder = Workspace:WaitForChild("Mobs")
 local ArrowsFolder = Workspace:FindFirstChild("Arrows")
@@ -47,10 +46,27 @@ local ById = {}
 local ByModel = setmetatable({}, { __mode = "k" })
 
 local PathCache = setmetatable({}, { __mode = "k" })
+local PathRetryAt = setmetatable({}, { __mode = "k" })
 
 local moveParts = {}
 local moveCFrames = {}
 local previousMoveCount = 0
+local Pending = {}
+local PendingByModel = {}
+local pendingCursor = 1
+local function queueMob(model,args)
+	if not model or not model.Parent or not running() then return end
+	local existing=PendingByModel[model]
+	if existing then if args then existing.Args=args end; return end
+	local record={Model=model,Args=args,Deadline=os.clock()+(Settings.RegistrationTimeout or 10),Index=#Pending+1}
+	Pending[record.Index]=record; PendingByModel[model]=record
+end
+local function removePending(record)
+	if not record or not record.Index then return end
+	local last=Pending[#Pending]
+	Pending[record.Index]=last; last.Index=record.Index
+	Pending[#Pending]=nil; PendingByModel[record.Model]=nil; record.Index=nil
+end
 
 local function currentMap()
 	local mapContainer = Workspace:FindFirstChild("Map")
@@ -180,6 +196,7 @@ local function removeState(state)
 end
 
 local function removeByModel(model)
+	removePending(PendingByModel[model])
 	local state = ByModel[model]
 
 	if state then
@@ -208,9 +225,8 @@ local function playOptionalSummonEffects(model, cframe, enemyId)
 	local summonEffects =
 		model:FindFirstChild("SummonEffects")
 
-	if not summonEffects then
-		return
-	end
+	if not summonEffects or summonEffectsBudget <= 0 then return end
+	summonEffectsBudget -= 1
 
 	local anchor =
 		createSummonEffectAnchor(cframe)
@@ -290,9 +306,10 @@ local function registerMob(
 	emergenceDuration,
 	emergenceDepth
 )
-	if not model or not id then
-		return
-	end
+	if not model or not model.Parent or not id or not running() then return false end
+	if ByModel[model] and ByModel[model].Id == id then return true end
+	if ByModel[model] then removeState(ByModel[model]) end
+	if ById[id] then removeState(ById[id]) end
 
 	local map = currentMap()
 	if not map then
@@ -300,20 +317,21 @@ local function registerMob(
 	end
 
 	local pathData = buildPathCache(map)[pathId]
+	if not pathData and os.clock() >= (PathRetryAt[map] or 0) then
+		PathRetryAt[map] = os.clock() + 0.5
+		PathCache[map] = nil
+		pathData = buildPathCache(map)[pathId]
+	end
 
 	if not pathData then
-		warn("[EnemyRenderer] Missing path:", pathId)
 		return
 	end
 
-	local root =
-		model.PrimaryPart
-		or model:FindFirstChild("HumanoidRootPart")
-		or model:FindFirstChildWhichIsA("BasePart")
-
-	if not root then
-		return
+	local root = model.PrimaryPart
+	if not root or not root.Parent then
+		root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChildWhichIsA("BasePart")
 	end
+	if not root or not root.Parent then return false end
 
 	model.PrimaryPart = root
 
@@ -346,9 +364,11 @@ local function registerMob(
 			or 1,
 
 		Height = height or 0,
+		NextRender = 0,
+		Position = root.Position,
 		Offset = Vector3.new(
 			(offsetX or 0) / 100,
-			0,
+			height or 0,
 			(offsetZ or 0) / 100
 		),
 
@@ -368,11 +388,7 @@ local function registerMob(
 				state.PathData,
 				state.Alpha
 			)
-			+ Vector3.new(
-				state.Offset.X,
-				state.Height,
-				state.Offset.Z
-			)
+			+ state.Offset
 
 		-- Move it underground immediately so there is no one-frame pop at
 		-- ground level before PreRender starts.
@@ -392,9 +408,58 @@ local function registerMob(
 			id
 		)
 	end
+	return true
 end
 
-ReplicateMob.OnClientEvent:Connect(registerMob)
+ReplicateMob.OnClientEvent:Connect(function(model,...)
+	if not registerMob(model,...) then queueMob(model,table.pack(...)) end
+end)
+local function observeFolder(folder)
+	if not folder then return end
+	folder.ChildAdded:Connect(function(model) queueMob(model) end)
+	for _,model in folder:GetChildren() do queueMob(model) end
+end
+observeFolder(MobsFolder)
+if ArrowsFolder ~= MobsFolder then observeFolder(ArrowsFolder) end
+local function recoverMob(model)
+	local stats=model:FindFirstChild('EnemyStats')
+	local speed=stats and stats:FindFirstChild('Speed')
+	local alpha=model:FindFirstChild('Alpha')
+	local id,pathId=model:GetAttribute('EnemyId'),model:GetAttribute('PathId')
+	local height=model:GetAttribute('EnemyHeight')
+	if not id or not pathId or not height or not speed or not alpha then return false end
+	-- Recover current movement only; joining/streaming must not replay spawn VFX.
+	return registerMob(model,id,pathId,height,model:GetAttribute('EnemyOffsetX'),model:GetAttribute('EnemyOffsetZ'),alpha.Value,speed.Value)
+end
+local function processPending()
+	local attempts=math.min(#Pending,Settings.RegistrationBudget or 64)
+	for _=1,attempts do
+		if #Pending==0 then break end
+		if pendingCursor>#Pending then pendingCursor=1 end
+		local record=Pending[pendingCursor]
+		local model=record.Model
+		local done=not model.Parent or os.clock()>=record.Deadline
+		if not done then
+			if record.Args then done=registerMob(model,table.unpack(record.Args,1,record.Args.n))
+			else done=recoverMob(model) end
+		end
+		if done then removePending(record) else pendingCursor+=1 end
+	end
+end
+local function clearRenderer()
+	if running() then return end
+	for index=#Active,1,-1 do removeState(Active[index]) end
+	table.clear(Pending); table.clear(PendingByModel); pendingCursor=1
+	table.clear(PathCache); table.clear(PathRetryAt); table.clear(moveParts); table.clear(moveCFrames); previousMoveCount=0
+end
+Info.GameRunning.Changed:Connect(function()
+	clearRenderer()
+	if running() then
+		for _,model in MobsFolder:GetChildren() do queueMob(model) end
+		if ArrowsFolder and ArrowsFolder~=MobsFolder then for _,model in ArrowsFolder:GetChildren() do queueMob(model) end end
+	end
+end)
+Info.Message.Changed:Connect(clearRenderer)
 
 RotateMob.OnClientEvent:Connect(function(model, part, duration)
 	local state = ByModel[model]
@@ -406,81 +471,47 @@ RotateMob.OnClientEvent:Connect(function(model, part, duration)
 	if part then
 		state.RotationTarget = part
 		state.RotationEndTime =
-			os.clock() + (duration or 0)
+			visualGameTime + (duration or 0)
 	else
 		state.RotationTarget = nil
 		state.RotationEndTime = 0
 	end
 end)
 
-EnemySync.OnClientEvent:Connect(function(packet)
-	if typeof(packet) ~= "buffer" then
-		return
+local function applySync(id,alpha,speed,sequence,timestamp)
+	local state=ById[id]
+	if not state or not SyncCodec.IsNewer(sequence,state.Sequence) then return end
+	state.Sequence=sequence
+	local age=math.clamp(Workspace:GetServerTimeNow()-timestamp,0,0.5)
+	if state.EmergenceProgress>=1 and state.PathData.Length>0 then
+		alpha=math.clamp(alpha+speed*gameSpeed*age/state.PathData.Length,0,1)
 	end
-
-	local length = buffer.len(packet)
-
-	if length < 2 then
-		return
-	end
-
-	local count = buffer.readu16(packet, 0)
-	local offset = 2
-
-	for _ = 1, count do
-		if offset + 7 >= length then
-			break
-		end
-
-		local id = buffer.readu32(packet, offset)
-		local alphaQ = buffer.readu16(packet, offset + 4)
-		local speedQ = buffer.readi16(packet, offset + 6)
-
-		offset += 8
-
-		local state = ById[id]
-
-		if state then
-			local authoritativeAlpha = alphaQ / 65535
-			local authoritativeSpeed = speedQ / 100
-
-			local errorAmount =
-				authoritativeAlpha - state.Alpha
-
-			if math.abs(errorAmount) > 0.06 then
-				state.Alpha = authoritativeAlpha
-			else
-				state.Alpha += errorAmount * 0.35
-			end
-
-			-- The server intentionally reports 0 speed while a summoned
-			-- enemy is emerging. Keep the original movement speed locally so
-			-- it can start immediately when the emergence finishes.
-			if state.EmergenceProgress >= 1
-				or authoritativeSpeed ~= 0
-			then
-				state.Speed = authoritativeSpeed
-			end
-		end
-	end
-end)
+	local errorAmount=alpha-state.Alpha
+	if math.abs(errorAmount)>0.06 then state.Alpha=alpha else state.Alpha+=errorAmount*0.35 end
+	if state.EmergenceProgress>=1 or speed~=0 then state.Speed=speed end
+end
+EnemySync.OnClientEvent:Connect(function(packet) SyncCodec.Decode(packet,applySync) end)
 
 RunService.PreRender:Connect(function(dt)
-	local now = os.clock()
+	if not running() then clearRenderer(); return end
+	processPending()
+	summonEffectsBudget = Settings.SummonEffectsPerFrame or 8
+	visualGameTime += dt * gameSpeed
+	local now = visualGameTime
+	local wall = os.clock()
+	local camera = Workspace.CurrentCamera
+	local cameraPosition = camera and camera.CFrame.Position
 	local count = 0
 
-	for i = 1, #Active do
+	for i = #Active, 1, -1 do
 		local state = Active[i]
 		local model = state.Model
 		local root = state.Root
 
-		if not (
-			state.Removed
-				or not model
-				or not model.Parent
-				or not root
-				or not root.Parent
-			) then
+		if state.Removed or not model or not model.Parent or not root or not root.Parent then
+			if model and model.Parent then queueMob(model) end
+			removeState(state)
+		else
 			local emerging =
 				state.EmergenceProgress < 1
 
@@ -503,16 +534,30 @@ RunService.PreRender:Connect(function(dt)
 					/ state.PathData.Length
 			end
 
+			if wall < state.NextRender then continue end
+			local hz = Settings.NearRenderHz or 60
+			if cameraPosition then
+				local delta = state.Position-cameraPosition
+				local distanceSquared = delta:Dot(delta)
+				if distanceSquared > (Settings.FarRenderDistance or 260)^2 then hz = Settings.FarRenderHz or 10
+				elseif distanceSquared > (Settings.NearRenderDistance or 120)^2 then hz = Settings.MidRenderHz or 30 end
+				if delta:Dot(camera.CFrame.LookVector) < 0 then hz = Settings.FarRenderHz or 10 end
+			end
+			if emerging or state.RotationTarget then hz = Settings.NearRenderHz or 60 end
+			local interval = 1/math.max(hz,1)
+			if state.RenderHz ~= hz then
+				state.NextRender = wall + interval*(0.25+0.75*((state.Id*0.61803398875)%1))
+				state.RenderHz = hz
+			else
+				state.NextRender += interval*math.max(1,math.floor((wall-state.NextRender)/interval)+1)
+			end
+
 			local baseCFrame =
 				sampleCFrame(
 					state.PathData,
 					state.Alpha
 				)
-				+ Vector3.new(
-					state.Offset.X,
-					state.Height,
-					state.Offset.Z
-				)
+				+ state.Offset
 
 			if emerging then
 				local progress =
@@ -570,6 +615,7 @@ RunService.PreRender:Connect(function(dt)
 				state.RotationTarget = nil
 			end
 
+			state.Position = baseCFrame.Position
 			count += 1
 			moveParts[count] = root
 			moveCFrames[count] = baseCFrame

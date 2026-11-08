@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local EnemyData = require(ReplicatedStorage.GameModules:WaitForChild("EnemyData"))
 local EnemyFlags = require(script.Parent:WaitForChild("EnemyFlags"))
 
+local Match = require(game.ServerScriptService.Simulation.MatchService)
 local EnemyEffects = {}
 
 local FLAGS = EnemyData.Flags
@@ -16,7 +17,7 @@ function EnemyEffects.ApplyBurn(runtime, duration, damage, now)
 	if not runtime or runtime.Dead then return end
 	if EnemyFlags.Has(runtime.Flags, FLAGS.Invincible) then return end
 
-	now = now or os.clock()
+	now = now or Match.Now()
 
 	runtime.BurnUntil = math.max(
 		runtime.BurnUntil,
@@ -36,7 +37,7 @@ function EnemyEffects.ApplyBleed(runtime, duration, damage, multiplier, now)
 	if not runtime or runtime.Dead then return end
 	if EnemyFlags.Has(runtime.Flags, FLAGS.Invincible) then return end
 
-	now = now or os.clock()
+	now = now or Match.Now()
 
 	runtime.BleedUntil = math.max(
 		runtime.BleedUntil,
@@ -61,7 +62,7 @@ function EnemyEffects.ApplyStun(runtime, duration, now)
 	if not runtime or runtime.Dead then return end
 	if EnemyFlags.Has(runtime.Flags, FLAGS.NoStun) then return end
 
-	now = now or os.clock()
+	now = now or Match.Now()
 
 	runtime.StunUntil = math.max(
 		runtime.StunUntil,
@@ -70,7 +71,7 @@ function EnemyEffects.ApplyStun(runtime, duration, now)
 end
 
 function EnemyEffects.IsStunned(runtime, now)
-	return runtime.StunUntil > (now or os.clock())
+	return runtime.StunUntil > (now or Match.Now())
 end
 
 function EnemyEffects.Update(runtime, now, damageCallback)
@@ -85,6 +86,7 @@ function EnemyEffects.Update(runtime, now, damageCallback)
 		end
 	end
 
+	if runtime.Dead or runtime.Cleaned then return end
 	if runtime.BleedUntil > 0 then
 		if now >= runtime.BleedUntil then
 			runtime.BleedUntil = 0
