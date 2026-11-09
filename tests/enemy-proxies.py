@@ -55,6 +55,7 @@ local stats=proxy.EnemyStats; local root=proxy.HumanoidRootPart
 assert(Visuals.Attach(proxy))
 assert(proxy.EnemyStats==stats and proxy.Head and proxy.Torso and proxy.Animations and proxy.AnimationController)
 assert(proxy.EnemyProxyRoot==root and proxy.PrimaryPart==proxy.HumanoidRootPart and proxy.PrimaryPart~=root)
+assert(proxy.PrimaryPart.CanQuery and proxy.PrimaryPart.CollisionGroup=='Default' and not proxy.PrimaryPart.CanCollide)
 local count=#proxy:GetDescendants(); assert(Visuals.Attach(proxy) and #proxy:GetDescendants()==count,'duplicate spawn must not duplicate a rig')
 local localRoot=proxy.PrimaryPart
 Visuals.Detach(proxy)

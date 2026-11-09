@@ -24,6 +24,9 @@ function Visuals.Attach(model)
   if object:IsA('Script') or object:IsA('LocalScript') then object:Destroy()
   elseif object:IsA('BasePart') then object.CanCollide=false; object.CanTouch=false; object.CollisionGroup='Mob' end
  end
+ -- A queryable local root provides a stable central hover surface, independent
+ -- of decorative mesh CanQuery flags or the Mob physics collision matrix.
+ root.CanQuery=true; root.CollisionGroup='Default'
  clone:PivotTo(proxyRoot.CFrame)
  proxyRoot.Name='EnemyProxyRoot'
  local children={}

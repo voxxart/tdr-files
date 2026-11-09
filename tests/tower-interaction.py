@@ -22,9 +22,9 @@ local origin,direction=vector(0),vector(1)
 world.CurrentCamera={ScreenPointToRay=function(_,x,y) assert(x==100 and y==50); return {Origin=origin,Direction=direction} end}
 local gui=node('PlayerGui'); local guiObjects={}
 function gui:GetGuiObjectsAtPosition() return guiObjects end
-local hits={}; local assistHit; local rayCalls=0; local sphereCalls=0
+local hits={}; local assistHit; local enemyHit; local radiusUsed; local rayCalls=0; local sphereCalls=0
 function world:Raycast() rayCalls+=1; return table.remove(hits,1) end
-function world:Spherecast(_,_,distance) sphereCalls+=1; assert(distance.X<=1000); return assistHit end
+function world:Spherecast(_,radius,distance,params) sphereCalls+=1; radiusUsed=radius; assert(distance.X<=1000); if #params.FilterDescendantsInstances==1 then return enemyHit end; return assistHit end
 local environment=setmetatable({game={GetService=function() return {GetPlayers=function() return {} end} end},
  Instance={new=function(kind) return node(kind) end},
  Enum={HighlightDepthMode={Occluded=1},RaycastFilterType={Exclude=1,Include=2}},
@@ -47,6 +47,15 @@ hits={wall,wall}; assistHit=hit
 local _,blocked=picker:Pick({X=100,Y=50}); assert(not blocked,'wall must block assisted hit')
 hits={wall,hit}
 local _,assisted=picker:Pick({X=100,Y=50}); assert(assisted==tower)
+local enemy=node('Model',world.Mobs); enemy.EnemyStats=node('Folder',enemy); enemy.EnemyStats.Health={Value=100}
+local enemyPart=node('Part',enemy); enemyHit={Instance=enemyPart,Distance=10,Position=vector(10)}
+picker.AssistRadius=0.25
+assistHit=nil; hits={wall,enemyHit}
+local _,easyEnemy,easyKind=picker:Pick({X=100,Y=50})
+assert(easyEnemy==enemy and easyKind=='Mob' and radiusUsed==1.25 and picker.AssistRadius==0.25)
+hits={wall,wall}; local _,hiddenEnemy=picker:Pick({X=100,Y=50}); assert(not hiddenEnemy,'enemy assistance must respect walls')
+enemy.Attributes.Dead=true; hits={wall}; assert(select(2,picker:Pick({X=100,Y=50}))==nil)
+enemy.Attributes.Dead=false; enemyHit=nil
 local button=node('GuiButton',gui); guiObjects={button}; local count=rayCalls
 assert(picker:Pick({X=100,Y=50})==nil and rayCalls==count)
 guiObjects={}; tower.Attributes.Dead=true

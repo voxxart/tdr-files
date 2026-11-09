@@ -2,6 +2,7 @@
 local Players = game:GetService('Players')
 local Interaction = {}
 Interaction.AssistRadius = 0.75
+Interaction.EnemyAssistRadius = 1.25
 
 function Interaction.new(world, playerGui)
 	local self = setmetatable({World=world,PlayerGui=playerGui}, {__index=Interaction})
@@ -74,17 +75,24 @@ function Interaction:Pick(position,ignore)
 	if model then return exact,model,kind end
 	local assist=RaycastParams.new()
 	assist.FilterType=Enum.RaycastFilterType.Include; assist.IgnoreWater=true
-	assist.FilterDescendantsInstances={self.Towers,self.Mobs,self.Units}
-	-- Never search beyond the first scenery obstruction.
-	local distance=if exact then math.min(1000,exact.Distance+self.AssistRadius) else 1000
-	local hit=self.World:Spherecast(ray.Origin,self.AssistRadius,ray.Direction*distance,assist)
-	model,kind=self:Resolve(hit and hit.Instance)
-	if model then
-		-- Verify the assisted surface is visible; the include-only cast ignores walls.
-		local sight=self.World:Raycast(ray.Origin,hit.Position-ray.Origin,params)
-		local visible=self:Resolve(sight and sight.Instance)
-		if not sight or visible==model then return hit,model,kind end
+	local function assisted(radius,folders,requiredKind)
+		if radius<=0 then return nil end
+		assist.FilterDescendantsInstances=folders
+		local distance=if exact then math.min(1000,exact.Distance+radius) else 1000
+		local hit=self.World:Spherecast(ray.Origin,radius,ray.Direction*distance,assist)
+		local target,targetKind=self:Resolve(hit and hit.Instance)
+		if target and (not requiredKind or targetKind==requiredKind) then
+			local sight=self.World:Raycast(ray.Origin,hit.Position-ray.Origin,params)
+			local visible=self:Resolve(sight and sight.Instance)
+			if not sight or visible==target then return hit,target,targetKind end
+		end
+		return nil
 	end
+	local hit,target,targetKind=assisted(self.AssistRadius,{self.Towers,self.Mobs,self.Units})
+	if target then return hit,target,targetKind end
+	-- Enemy assistance is independent of a player's deliberately narrow tower radius.
+	hit,target,targetKind=assisted(self.EnemyAssistRadius,{self.Mobs},'Mob')
+	if target then return hit,target,targetKind end
 	return exact,nil,nil
 end
 
