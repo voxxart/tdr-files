@@ -1,5 +1,8 @@
 # Batch 16: personal enemy event-currency drops
 
+For the current two/three-bounce, stationary drop, shared EventDrops orb, sound, and player-total billboard behavior, also apply [Batch 17](studio-batch-17-currency-pickup.md). It replaces the initial value labels and player coin-burst presentation described in this original batch.
+
+
 Each player has their own copy of a successful drop. Collecting yours does not remove another player's copy. Walk within pickup range to collect; no click is required.
 
 ## Replace

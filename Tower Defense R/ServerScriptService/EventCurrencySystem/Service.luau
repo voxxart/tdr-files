@@ -25,7 +25,7 @@ local requests=setmetatable({}, {__mode='k'})
 local function message(record)
  local recipients={}
  for userId in record.Eligible do recipients[tostring(userId)]=true end
- return {Kind='Spawn',Id=record.Id,From=record.From,Land=record.Land,Amount=record.Amount,Age=math.max(0,Match.Now()-record.Created),Lifetime=record.Lifetime,Recipients=recipients}
+ return {Kind='Spawn',Id=record.Id,From=record.From,Land=record.Land,Amount=record.Amount,Age=math.max(0,Match.Now()-record.Created),Lifetime=record.Lifetime,Bounces=record.Bounces,Recipients=recipients}
 end
 local function remove(record,kind,player)
  if not store:Remove(record) then return end
@@ -50,7 +50,7 @@ function Service.TryDrop(origin,map,height)
  for _,player in Players:GetPlayers() do eligible[player.UserId]=true end
  if next(eligible)==nil then return false end
  local record=store:Add({From=origin,Land=land,Amount=random:NextInteger(low,high),Created=now,Lifetime=math.max(1,Config.Lifetime),
-  Eligible=eligible,Claimed={},Ready=now+Config.LaunchDuration+Config.BounceDuration,Generation=Match.Capture()})
+  Eligible=eligible,Claimed={},Bounces=random:NextInteger(math.clamp(Config.MinBounces or 2,1,6),math.clamp(math.max(Config.MinBounces or 2,Config.MaxBounces or 3),1,6)),Ready=now+Config.LaunchDuration+Config.BounceDuration,Generation=Match.Capture()})
  if record then table.insert(pending,message(record)); return true end
  return false
 end

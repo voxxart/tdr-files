@@ -29,20 +29,16 @@ function Pool:Acquire(asset,scale)
   highlight.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop; highlight.FillTransparency=1
   highlight.OutlineColor=Color3.new(1,1,1); highlight.OutlineTransparency=0; highlight.Parent=object
   slot.Highlight=highlight
-  local billboard=Instance.new('BillboardGui'); billboard.Name='Amount'; billboard.Adornee=slot.Parts[1].Part
-  billboard.Size=UDim2.fromOffset(80,26); billboard.StudsOffsetWorldSpace=Vector3.new(0,1.5,0); billboard.AlwaysOnTop=true; billboard.Parent=object
-  local label=Instance.new('TextLabel'); label.Size=UDim2.fromScale(1,1); label.BackgroundTransparency=1
-  label.Font=Enum.Font.GothamBold; label.TextSize=18; label.TextColor3=Color3.new(1,1,1); label.TextStrokeTransparency=0.4; label.Parent=billboard
-  slot.Label=label; slot.Billboard=billboard
   self.All[slot]=true; self.Created+=1
  end
  scale=scale or 1
  if slot.Object:IsA('Model') then slot.Object:ScaleTo(slot.Scale*scale)
  else slot.Object.Size=slot.Parts[1].Size*scale end
  local pivot=slot.Object:GetPivot()
+ slot.Rotation=slot.Rotation or pivot.Rotation
  for _,entry in slot.Parts do entry.Offset=pivot:ToObjectSpace(entry.Part.CFrame); entry.Part.Transparency=entry.Transparency end
  slot.Height=(slot.Object:IsA('Model') and slot.Object:GetExtentsSize().Y or slot.Object.Size.Y)/2
- slot.Highlight.Enabled=true; slot.Billboard.Enabled=true; slot.Label.TextTransparency=0
+ slot.Highlight.Enabled=true
  slot.Object.Parent=self.Parent
  slot.InUse=true
  return slot
