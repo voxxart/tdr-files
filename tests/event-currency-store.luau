@@ -1,0 +1,7 @@
+local Store=require('../Tower Defense R/ServerScriptService/EventCurrencySystem/DropStore')
+local s=Store.new(2)
+local a=s:Add({Amount=5}); local b=s:Add({Amount=10})
+assert(a.Id~=b.Id and not s:Add({Amount=20}))
+assert(s:Remove(a) and not s:Remove(a) and s.Active[1]==b and b.Index==1)
+s:Clear(); local c=s:Add({}); assert(c.Id>b.Id and #s.Active==1)
+print('Event currency store passed: cap, unique IDs, dense removal, duplicate rejection, restart')

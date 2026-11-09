@@ -10,6 +10,9 @@ local exitEvent = events:WaitForChild("ExitGame")
 local GetMedalStatus = ReplicatedStorage.Functions:WaitForChild("GetMedalStatus")
 
 local data = {}
+local disconnectSaves = 0
+local EventWallet = require(game.ServerScriptService.EventCurrencySystem.Wallet)
+EventWallet.Bind(function(player) return data[player.UserId] end)
 
 ------------------------------------------------
 -- LOAD DATA
@@ -30,6 +33,7 @@ local function LoadData(player)
 
 	until success or attempt >= 6
 
+	if not player.Parent then return end
 	if success then
 		if not playerData then
 			playerData = {
@@ -101,6 +105,7 @@ local function LoadData(player)
 		end
 
 		data[player.UserId] = playerData
+		EventWallet.Publish(player)
 	else
 		player:Kick("Data failed to load")
 	end
@@ -132,6 +137,7 @@ local rewardLock = {}
 -- MAIN SAVE + REWARD FUNCTION
 ------------------------------------------------
 local function saveData(player)
+	local currencyVersion = EventWallet.Version(player)
 	local playerData = data[player.UserId]
 	if not playerData then return end
 
@@ -508,6 +514,8 @@ local function saveData(player)
 
 	if not success then
 		player:Kick("Data save failed")
+	else
+		EventWallet.MarkSaved(player, currencyVersion)
 	end
 end
 
@@ -540,12 +548,38 @@ exitEvent.OnServerEvent:Connect(saveData)
 ------------------------------------------------
 -- SERVER SHUTDOWN SAVE
 ------------------------------------------------
+local function saveLoadedCurrency(player)
+	local playerData = data[player.UserId]
+	if not playerData or not EventWallet.Dirty(player) then return true end
+	local version = EventWallet.Version(player)
+	local success, err
+	for attempt=1,3 do
+		success, err = pcall(function()
+			database:UpdateAsync(player.UserId, function() return playerData end)
+		end)
+		if success then EventWallet.MarkSaved(player, version); return true end
+		task.wait(1)
+	end
+	warn("Event currency save failed:", player.UserId, err)
+	return false
+end
+
 game:BindToClose(function()
+	local pendingSaves = 0
 	if not RunService:IsStudio() then
 		for _, player in pairs(Players:GetPlayers()) do
-			task.spawn(saveData, player)
+			pendingSaves += 1
+			EventWallet.Close(player)
+			task.spawn(function()
+				local ok, err = pcall(saveData, player)
+				if not ok then warn("Shutdown reward save failed:", player.UserId, err) end
+				saveLoadedCurrency(player)
+				pendingSaves -= 1
+			end)
 		end
 	end
+	local deadline = os.clock() + 25
+	while (pendingSaves > 0 or disconnectSaves > 0) and os.clock() < deadline do task.wait(0.1) end
 end)
 
 ReplicatedStorage.Functions.GetData.OnServerInvoke = function(player) 
@@ -561,3 +595,17 @@ _G.DataStore = {
 	end,
 	SavePlayerData = saveData
 }
+
+-- Currency pickups do not make datastore calls. Persist dirty loaded balances on
+-- disconnect without running the match-reward calculation a second time.
+Players.PlayerRemoving:Connect(function(player)
+	EventWallet.Close(player)
+	if data[player.UserId] and EventWallet.Dirty(player) then
+		disconnectSaves += 1
+		saveLoadedCurrency(player)
+		disconnectSaves -= 1
+	end
+	EventWallet.Forget(player)
+	data[player.UserId] = nil
+	rewardLock[player.UserId] = nil
+end)

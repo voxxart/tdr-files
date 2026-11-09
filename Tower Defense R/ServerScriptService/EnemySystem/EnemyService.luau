@@ -25,6 +25,7 @@ local EnemyEffects = require(script.Parent:WaitForChild("EnemyEffects"))
 local EnemyDamage = require(script.Parent:WaitForChild("EnemyDamage"))
 local LegacyEffects = require(script.Parent.LegacyEffects)
 local ProxyFactory = require(script.Parent.EnemyProxyFactory)
+local EventCurrency = require(game.ServerScriptService.EventCurrencySystem.Service)
 local SyncCodec = require(ReplicatedStorage.GameModules.EnemySyncCodec)
 
 local TowerDeath = require(game.ServerScriptService.Main:WaitForChild("TowerDeath"))
@@ -412,6 +413,7 @@ function EnemyService.OnDeath(runtime)
 	end
 
 	fireDeathPresentation(runtime)
+	EventCurrency.TryDrop(runtimeCFrame(runtime).Position, runtime.Map, runtime.Height)
 
 	-- Gameplay model dies NOW. Clients recreate an optional lightweight
 	-- death presentation from ReplicatedStorage, so dead enemies cannot

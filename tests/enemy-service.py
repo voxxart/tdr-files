@@ -72,10 +72,10 @@ local kills={Value=0}
 local Match={Capture=function() return generation end,IsCurrent=function(g) return info.GameRunning.Value and g==generation end,Now=function() return now end,
  Wait=function(g) return info.GameRunning.Value and g==generation end,After=function() end}
 local data={Settings={LightweightEnemies={Synthetic=true},SpawnBudgetPerFrame=10000,ServerPositionHz=10,ClientSyncHz=5,AlphaMirrorHz=5,SyncPacketBytes=900,BurnTick=1,BleedTick=1},Enemies={},Flags={Hidden=1,Flying=2,Invincible=4,NoCash=8,Aggro=16,Lead=32,NoStun=64,InstaKill=128,FinalBoss=256}}
-local deps={data=data,match=Match,death={},paths={GetRandomPath=function() return path end,SampleCFrame=function(_,alpha) return frame(vec(alpha*100,0,0)) end}}
+local deps={currency={TryDrop=function() return false end},data=data,match=Match,death={},paths={GetRandomPath=function() return path end,SampleCFrame=function(_,alpha) return frame(vec(alpha*100,0,0)) end}}
 local parent=node('Folder'); for key,value in {EnemyRuntime='runtime',EnemyPaths='paths',EnemyFlags='flags',EnemyEffects='effects',EnemyDamage='damage',LegacyEffects='bridge',EnemyProxyFactory='factory'} do parent[key]=value end
 local main=node('Folder'); main.TowerDeath='death'
-local game={ServerScriptService={Simulation={MatchService='match',SpatialIndex='index',TargetPolicy='policy'},EnemySystem={EnemyRuntime='runtime'},Main=main}}
+local game={ServerScriptService={EventCurrencySystem={Service='currency'},Simulation={MatchService='match',SpatialIndex='index',TargetPolicy='policy'},EnemySystem={EnemyRuntime='runtime'},Main=main}}
 function game:GetService(name)
  if name=='CollectionService' then return {GetTags=function() return {} end} elseif name=='Workspace' then return world elseif name=='ReplicatedStorage' then return rep elseif name=='RunService' then return {Heartbeat=beat}
  elseif name=='Players' then return {GetPlayers=function() return {{FindFirstChild=function(_,key) if key=='Kills' then return kills end end}} end} else return {} end
