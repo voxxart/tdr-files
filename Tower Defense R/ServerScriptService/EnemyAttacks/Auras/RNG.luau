@@ -39,11 +39,17 @@ function RNG.Apply(caster, mob)
 	local source = neon and neon:FindFirstChild('Attachment')
 	local torso = mob:FindFirstChild('Torso')
 	local destination = torso and torso:FindFirstChild('Center')
+	local proxyDestination
+	if not destination and mob:GetAttribute('LightweightEnemy') then
+		proxyDestination=Instance.new('Attachment'); proxyDestination.Name='RNGProxyCenter'; proxyDestination.Parent=hitbox
+		destination=proxyDestination
+	end
 	if beamTemplate and source and destination then
 		beam = beamTemplate:Clone(); beam.Name = 'RNGAuraBeam'
 		beam.Attachment0 = source; beam.Attachment1 = destination; beam.Parent = neon
 	end
 	return function()
+		if proxyDestination then proxyDestination:Destroy() end
 		if beam then beam:Destroy() end
 		if weld then weld:Destroy() end
 		if shield then

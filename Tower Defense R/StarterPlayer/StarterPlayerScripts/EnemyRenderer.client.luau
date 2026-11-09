@@ -16,6 +16,7 @@ local Workspace = game:GetService("Workspace")
 local BezierPath = require(ReplicatedStorage.Modules:WaitForChild("BezierPath"))
 local EnemyData = require(ReplicatedStorage.GameModules:WaitForChild("EnemyData"))
 local SyncCodec = require(ReplicatedStorage.GameModules:WaitForChild("EnemySyncCodec"))
+local EnemyVisuals = require(ReplicatedStorage.GameModules:WaitForChild("EnemyVisuals"))
 
 local Settings = EnemyData.Settings
 local SAMPLE_COUNT = Settings.PathSampleCount or 512
@@ -172,6 +173,7 @@ local function removeState(state)
 	ById[state.Id] = nil
 
 	if state.Model then
+		EnemyVisuals.Detach(state.Model)
 		ByModel[state.Model] = nil
 	end
 
@@ -327,6 +329,8 @@ local function registerMob(
 		return
 	end
 
+	local visualReady, visualReason = EnemyVisuals.Attach(model)
+	if not visualReady then return false, visualReason end
 	local root = model.PrimaryPart
 	if not root or not root.Parent then
 		root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChildWhichIsA("BasePart")
@@ -438,10 +442,13 @@ local function processPending()
 		if pendingCursor>#Pending then pendingCursor=1 end
 		local record=Pending[pendingCursor]
 		local model=record.Model
-		local done=not model.Parent or os.clock()>=record.Deadline
+		local done=not model.Parent
+		local reason
 		if not done then
-			if record.Args then done=registerMob(model,table.unpack(record.Args,1,record.Args.n))
-			else done=recoverMob(model) end
+			if record.Args then done,reason=registerMob(model,table.unpack(record.Args,1,record.Args.n))
+			else done,reason=recoverMob(model) end
+			if reason=='Budget' then record.Deadline=os.clock()+(Settings.RegistrationTimeout or 10)
+			elseif not done and os.clock()>=record.Deadline then done=true end
 		end
 		if done then removePending(record) else pendingCursor+=1 end
 	end
@@ -494,6 +501,7 @@ EnemySync.OnClientEvent:Connect(function(packet) SyncCodec.Decode(packet,applySy
 
 RunService.PreRender:Connect(function(dt)
 	if not running() then clearRenderer(); return end
+	EnemyVisuals.BeginFrame()
 	processPending()
 	summonEffectsBudget = Settings.SummonEffectsPerFrame or 8
 	visualGameTime += dt * gameSpeed

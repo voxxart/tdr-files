@@ -39,7 +39,18 @@ function Budget:Check(r)
  local root=r.Model.PrimaryPart or r.Root
  if not root or not root.Parent then return end
  r.Root=root
+ local becameReady=false
+ if not r.VisualReady and r.Model:GetAttribute('EnemyVisualReady') then
+  r.VisualReady=true
+  local ok,size=pcall(function() return r.Model:GetExtentsSize() end)
+  if ok then r.Radius=math.max(2,size.Magnitude/2) end
+  becameReady=true
+ end
  local visible=Visibility.Test(self.Adapter.Camera(),root.Position,r.Radius,self.Adapter.Margin or 48)
+ if becameReady and visible and r.Visible then
+  local tracks=self.Adapter.Tracks(r.Model)
+  if not tracks or next(tracks)==nil then self.Adapter.Fallback(r.Model) end
+ end
  if visible==r.Visible then return end
  r.Visible=visible
  local t=clock(self,r)

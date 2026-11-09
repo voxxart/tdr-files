@@ -24,6 +24,7 @@ local EnemyFlags = require(script.Parent:WaitForChild("EnemyFlags"))
 local EnemyEffects = require(script.Parent:WaitForChild("EnemyEffects"))
 local EnemyDamage = require(script.Parent:WaitForChild("EnemyDamage"))
 local LegacyEffects = require(script.Parent.LegacyEffects)
+local ProxyFactory = require(script.Parent.EnemyProxyFactory)
 local SyncCodec = require(ReplicatedStorage.GameModules.EnemySyncCodec)
 
 local TowerDeath = require(game.ServerScriptService.Main:WaitForChild("TowerDeath"))
@@ -759,7 +760,7 @@ function EnemyService.Spawn(name, quantity, cooldown, healthMultiplier, speedMul
 
 		if not claimSpawn(generation) then return end
 		registerEnemy(
-			template:Clone(),
+			ProxyFactory.Clone(template),
 			map,
 			pathData,
 			{
@@ -792,7 +793,7 @@ function EnemyService.ArrowSpawn(name, quantity, cooldown, healthMultiplier, spe
 
 		if not claimSpawn(generation) then return end
 		registerEnemy(
-			template:Clone(),
+			ProxyFactory.Clone(template),
 			map,
 			pathData,
 			{
@@ -1014,7 +1015,7 @@ function EnemyService.Summon(
 
 		if not claimSpawn(generation, canContinue) then return end
 		registerEnemy(
-			template:Clone(),
+			ProxyFactory.Clone(template),
 			map,
 			pathData,
 			{
@@ -1272,7 +1273,12 @@ function EnemyService.Start()
 end
 
 function EnemyService.GetDiagnostics()
+	local lightweight=0
+	for _,runtime in EnemyRuntime.GetActiveList() do
+		if runtime.Model and runtime.Model:GetAttribute('LightweightEnemy') then lightweight+=1 end
+	end
 	return {
+		LightweightEnemies = lightweight,
 		ActiveEnemies = #EnemyRuntime.GetActiveList(),
 		LastSyncPackets = lastSyncPackets, LastSyncBytesPerClient = lastSyncBytes,
 		LastMovedHitboxes = previousBulkCount,

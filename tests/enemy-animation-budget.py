@@ -15,6 +15,7 @@ local function track(name,looped,length)
 end
 local function model()
  local m={Parent=true,PrimaryPart={Parent=true,Position={X=0,Y=0,Z=-100}},Tracks={}}
+ function m:GetAttribute() return nil end
  function m:FindFirstChild() return self.PrimaryPart end
  function m:GetExtentsSize() return {Magnitude=4} end
  return m

@@ -2,7 +2,7 @@
 from pathlib import Path
 import subprocess,tempfile
 root=Path(__file__).resolve().parents[1]
-paths={'service':'ServerScriptService/EnemySystem/EnemyService.luau','runtime':'ServerScriptService/EnemySystem/EnemyRuntime.luau','effects':'ServerScriptService/EnemySystem/EnemyEffects.luau','bridge':'ServerScriptService/EnemySystem/LegacyEffects.luau','damage':'ServerScriptService/EnemySystem/EnemyDamage.luau','flags':'ServerScriptService/EnemySystem/EnemyFlags.luau','codec':'ReplicatedStorage/GameModules/EnemySyncCodec.luau','targeting':'ServerScriptService/TowerSystem/Targeting.luau','index':'ServerScriptService/Simulation/SpatialIndex.luau','policy':'ServerScriptService/Simulation/TargetPolicy.luau'}
+paths={'service':'ServerScriptService/EnemySystem/EnemyService.luau','runtime':'ServerScriptService/EnemySystem/EnemyRuntime.luau','effects':'ServerScriptService/EnemySystem/EnemyEffects.luau','bridge':'ServerScriptService/EnemySystem/LegacyEffects.luau','damage':'ServerScriptService/EnemySystem/EnemyDamage.luau','flags':'ServerScriptService/EnemySystem/EnemyFlags.luau','codec':'ReplicatedStorage/GameModules/EnemySyncCodec.luau','factory':'ServerScriptService/EnemySystem/EnemyProxyFactory.luau','targeting':'ServerScriptService/TowerSystem/Targeting.luau','index':'ServerScriptService/Simulation/SpatialIndex.luau','policy':'ServerScriptService/Simulation/TargetPolicy.luau'}
 code='local sources={}\n'+'\n'.join('sources.'+k+'=[====['+(root/'Tower Defense R'/v).read_text()+']====]' for k,v in paths.items())+r'''
 local function signal()
  local s={Entries={}}
@@ -28,6 +28,13 @@ local function node(class,name)
  function n:GetPropertyChangedSignal(key) if not self.Signals[key] then self.Signals[key]=signal() end; return self.Signals[key] end
  function n:SetAttribute(key,value) self.Attributes[key]=value end
  function n:GetAttribute(key) return self.Attributes[key] end
+ function n:GetAttributes() return self.Attributes end
+ function n:Clone()
+  local copy=node(self.Class,self.Name); copy.Value=self.Value
+  for key,value in pairs(self.Attributes) do copy.Attributes[key]=value end
+  for _,child in self.Children do local cloned=child:Clone(); cloned.Parent=copy end
+  return copy
+ end
  function n:Destroy() self.Parent=nil; self.Destroyed=true end
  function n:FireAllClients(...) table.insert(self.Packets,table.pack(...)) end
  return n
@@ -64,17 +71,17 @@ local beat=signal(); function beat:Wait() coroutine.yield() end
 local kills={Value=0}
 local Match={Capture=function() return generation end,IsCurrent=function(g) return info.GameRunning.Value and g==generation end,Now=function() return now end,
  Wait=function(g) return info.GameRunning.Value and g==generation end,After=function() end}
-local data={Settings={SpawnBudgetPerFrame=10000,ServerPositionHz=10,ClientSyncHz=5,AlphaMirrorHz=5,SyncPacketBytes=900,BurnTick=1,BleedTick=1},Enemies={},Flags={Hidden=1,Flying=2,Invincible=4,NoCash=8,Aggro=16,Lead=32,NoStun=64,InstaKill=128,FinalBoss=256}}
+local data={Settings={LightweightEnemies={Synthetic=true},SpawnBudgetPerFrame=10000,ServerPositionHz=10,ClientSyncHz=5,AlphaMirrorHz=5,SyncPacketBytes=900,BurnTick=1,BleedTick=1},Enemies={},Flags={Hidden=1,Flying=2,Invincible=4,NoCash=8,Aggro=16,Lead=32,NoStun=64,InstaKill=128,FinalBoss=256}}
 local deps={data=data,match=Match,death={},paths={GetRandomPath=function() return path end,SampleCFrame=function(_,alpha) return frame(vec(alpha*100,0,0)) end}}
-local parent=node('Folder'); for key,value in {EnemyRuntime='runtime',EnemyPaths='paths',EnemyFlags='flags',EnemyEffects='effects',EnemyDamage='damage',LegacyEffects='bridge'} do parent[key]=value end
+local parent=node('Folder'); for key,value in {EnemyRuntime='runtime',EnemyPaths='paths',EnemyFlags='flags',EnemyEffects='effects',EnemyDamage='damage',LegacyEffects='bridge',EnemyProxyFactory='factory'} do parent[key]=value end
 local main=node('Folder'); main.TowerDeath='death'
 local game={ServerScriptService={Simulation={MatchService='match',SpatialIndex='index',TargetPolicy='policy'},EnemySystem={EnemyRuntime='runtime'},Main=main}}
 function game:GetService(name)
- if name=='Workspace' then return world elseif name=='ReplicatedStorage' then return rep elseif name=='RunService' then return {Heartbeat=beat}
+ if name=='CollectionService' then return {GetTags=function() return {} end} elseif name=='Workspace' then return world elseif name=='ReplicatedStorage' then return rep elseif name=='RunService' then return {Heartbeat=beat}
  elseif name=='Players' then return {GetPlayers=function() return {{FindFirstChild=function(_,key) if key=='Kills' then return kills end end}} end} else return {} end
 end
 local env=setmetatable({game=game,workspace=world,script={Parent=parent},Vector3={new=vec},CFrame={new=frame},
- Instance={new=function(class) return node(class) end},Enum={BulkMoveMode={FireCFrameChanged=1}},
+ Instance={new=function(class) local n=node(class); if class=='Part' then n.Position=vec(0,0,0) end; return n end},Enum={BulkMoveMode={FireCFrameChanged=1}},
  typeof=function(value) return type(value)=='table' and value.Instance and 'Instance' or typeof(value) end},{__index=getfenv()})
 local function load(id)
  if deps[id] then return deps[id] end
@@ -99,7 +106,7 @@ step(0.2)
 local sync=events:FindFirstChild('EnemySync'); assert(#sync.Packets==46)
 for _,args in sync.Packets do assert(buffer.len(args[1])<=900) end
 local diagnostics=service.GetDiagnostics()
-assert(diagnostics.ActiveEnemies==5000 and diagnostics.LastSyncPackets==46 and diagnostics.LastSyncBytesPerClient==40644)
+assert(diagnostics.ActiveEnemies==5000 and diagnostics.LightweightEnemies==5000 and diagnostics.LastSyncPackets==46 and diagnostics.LastSyncBytesPerClient==40644)
 local first=runtime.GetActiveList()[1]; local alpha=first.Alpha
 assert(alpha>0 and moves==1)
 first.LegacyBurn.Value=3; first.LegacyBurnDamage.Value=7; step(0.01)

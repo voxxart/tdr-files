@@ -63,14 +63,14 @@ local bezier={new=function()
 end}
 local events=node('Folder'); for _,key in {'ReplicateMob','RotateMob','EnemySync'} do events[key]={OnClientEvent=signal()} end
 local rep={Modules=node('Folder'),GameModules=node('Folder'),WaitForChild=function(_,key) assert(key=='Events'); return events end}
-rep.Modules.BezierPath='bezier'; rep.GameModules.EnemyData='data'; rep.GameModules.EnemySyncCodec='codec'
+rep.Modules.BezierPath='bezier'; rep.GameModules.EnemyData='data'; rep.GameModules.EnemySyncCodec='codec'; rep.GameModules.EnemyVisuals='visuals'
 local codecModule=assert(loadstring(codecSource))()
 local data={Settings={PathSampleCount=4,RegistrationBudget=64,RegistrationTimeout=10}}
 local render=signal()
 local env=setmetatable({workspace=world,game={GetService=function(_,key)
  if key=='Workspace' then return world elseif key=='ReplicatedStorage' then return rep elseif key=='RunService' then return {PreRender=render} else return {} end
 end},Vector3={new=vec},CFrame={new=frame,lookAt=function(p) return frame(p) end},Enum={BulkMoveMode={FireCFrameChanged=1}},
- require=function(id) if id=='bezier' then return bezier elseif id=='data' then return data else assert(id=='codec'); return codecModule end end,
+ require=function(id) if id=='bezier' then return bezier elseif id=='data' then return data elseif id=='visuals' then return {Attach=function() return true end,Detach=function() end,BeginFrame=function() end} else assert(id=='codec'); return codecModule end end,
  os={clock=function() return wall end}},{__index=getfenv()})
 local function enemy(id,far)
  local m=node('Model','Enemy'..id)

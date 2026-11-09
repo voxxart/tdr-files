@@ -30,6 +30,9 @@ return {
 		ClientSyncHz = 5,
 		SyncPacketBytes = 900,
 		SpawnBudgetPerFrame = 32,
+		-- Opt-in compatibility proxies. Unsupported/tagged/scripted rigs fall back.
+		ClientRigBuildsPerFrame = 16,
+		LightweightEnemies = {Noob=true, Zombie=true, ["Armored Noob"]=true, ["Armored Zombie"]=true},
 		-- Visual rates only; authoritative movement/attacks are unchanged.
 		NearRenderDistance = 120,
 		FarRenderDistance = 260,
