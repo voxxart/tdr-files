@@ -43,3 +43,9 @@ This batch retains the existing UI layout and tower-specific ability controls. I
 ## Validation
 
 All 165 game Luau scripts compile. Seventeen Luau test files and five integration/renderer fixtures pass. New checks execute actual picking/outline code against mocked engine boundaries and test pending-action rejection, captured targets, independent towers, and recovery after remote errors. Actual ray geometry, UI hit testing, Highlight appearance, and network ordering in the full controller still need Studio validation.
+
+## Direct tower picking update
+
+Replace only **ModuleScript** `ReplicatedStorage.GameModules.TowerInteraction` for direct tower hover/click selection. Towers and enemies no longer use an assist radius. Unit assistance remains separate as `UnitAssistRadius`; the old AssistRadius setting is removed.
+
+Tower picking skips the tower's named Border part and fully transparent tower helpers, recasting up to sixteen times to find visible geometry. This changes only the picking filter, not placement boundaries or physics properties. Nested upgrade parts still resolve to their owning tower; hover/selection outlines, UI blocking, and wall occlusion remain. Test upgraded towers, borders, empty space near a tower, and overlapping towers in Studio.

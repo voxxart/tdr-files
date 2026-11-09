@@ -24,7 +24,7 @@ local gui=node('PlayerGui'); local guiObjects={}
 function gui:GetGuiObjectsAtPosition() return guiObjects end
 local hits={}; local assistHit; local enemyHit; local radiusUsed; local rayCalls=0; local sphereCalls=0
 function world:Raycast() rayCalls+=1; return table.remove(hits,1) end
-function world:Spherecast(_,radius,distance,params) sphereCalls+=1; radiusUsed=radius; assert(distance.X<=1000); if #params.FilterDescendantsInstances==1 then return enemyHit end; return assistHit end
+function world:Spherecast(_,radius,distance,params) sphereCalls+=1; radiusUsed=radius; assert(distance.X<=1000); return assistHit end
 local environment=setmetatable({game={GetService=function() return {GetPlayers=function() return {} end} end},
  Instance={new=function(kind) return node(kind) end},
  Enum={HighlightDepthMode={Occluded=1},RaycastFilterType={Exclude=1,Include=2}},
@@ -45,11 +45,21 @@ picker:Update(tower,nil); assert(picker.Hover.Enabled and not picker.Selected.En
 local wall={Instance=node('Part',world),Distance=10,Position=vector(10)}
 hits={wall,wall}; assistHit=hit
 local _,blocked=picker:Pick({X=100,Y=50}); assert(not blocked,'wall must block assisted hit')
-hits={wall,hit}
-local _,assisted=picker:Pick({X=100,Y=50}); assert(assisted==tower)
+hits={wall}; assistHit=hit
+local _,assisted=picker:Pick({X=100,Y=50}); assert(not assisted,'tower hover must not use assistance')
+local border=node('Part',tower); border.Name='Border'; border.Transparency=1
+local borderHit={Instance=border,Distance=19,Position=vector(19)}
+local hidden=node('Part',tower); hidden.Transparency=1
+local hiddenHit={Instance=hidden,Distance=19.5,Position=vector(19.5)}
+hits={borderHit,hiddenHit,hit}; local before=sphereCalls
+assert(select(2,picker:Pick({X=100,Y=50}))==tower and sphereCalls==before,'visible body must be picked through invisible tower helpers')
+local unit=node('Model',world.Units); unit.EnemyStats=node('Folder',unit); unit.EnemyStats.Health={Value=100}
+local unitHit={Instance=node('Part',unit),Distance=10,Position=vector(10)}
+hits={wall,unitHit}; assistHit=unitHit
+assert(select(2,picker:Pick({X=100,Y=50}))==unit,'existing unit assist must still work')
 local enemy=node('Model',world.Mobs); enemy.EnemyStats=node('Folder',enemy); enemy.EnemyStats.Health={Value=100}
 local enemyPart=node('Part',enemy); enemyHit={Instance=enemyPart,Distance=10,Position=vector(10)}
-picker.AssistRadius=0.25
+picker.UnitAssistRadius=0.75
 assistHit=nil; hits={enemyHit}
 local beforeSphere=sphereCalls
 local _,exactEnemy,exactKind=picker:Pick({X=100,Y=50})

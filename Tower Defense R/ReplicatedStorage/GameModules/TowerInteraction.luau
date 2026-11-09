@@ -1,7 +1,7 @@
 -- Client-only picking and two reusable outlines. No connections or per-tower objects.
 local Players = game:GetService('Players')
 local Interaction = {}
-Interaction.AssistRadius = 0.75
+Interaction.UnitAssistRadius = 0.75
 local passiveTooltips = {MobHoverGui=true, UnitHoverGui=true, TowerHoverGui=true}
 
 function Interaction.new(world, playerGui)
@@ -74,8 +74,16 @@ function Interaction:Pick(position,ignore)
 	local params=RaycastParams.new()
 	params.FilterType=Enum.RaycastFilterType.Exclude; params.IgnoreWater=true
 	params.FilterDescendantsInstances=excluded
-	local exact=self.World:Raycast(ray.Origin,ray.Direction*1000,params)
-	local model,kind=self:Resolve(exact and exact.Instance)
+	local exact,model,kind
+	-- Borders and invisible tower helpers are not the tower's visible body.
+	-- Recast through them locally without changing placement/collision properties.
+	for _=1,16 do
+		exact=self.World:Raycast(ray.Origin,ray.Direction*1000,params)
+		model,kind=self:Resolve(exact and exact.Instance)
+		if kind~='Tower' or (exact.Instance.Name~='Border' and exact.Instance.Transparency~=1) then break end
+		table.insert(excluded,exact.Instance); params.FilterDescendantsInstances=excluded
+		exact,model,kind=nil,nil,nil
+	end
 	if model then return exact,model,kind end
 	local assist=RaycastParams.new()
 	assist.FilterType=Enum.RaycastFilterType.Include; assist.IgnoreWater=true
@@ -85,15 +93,15 @@ function Interaction:Pick(position,ignore)
 		local distance=if exact then math.min(1000,exact.Distance+radius) else 1000
 		local hit=self.World:Spherecast(ray.Origin,radius,ray.Direction*distance,assist)
 		local target,targetKind=self:Resolve(hit and hit.Instance)
-		if target and targetKind~="Mob" then
+		if target and targetKind=="Unit" then
 			local sight=self.World:Raycast(ray.Origin,hit.Position-ray.Origin,params)
 			local visible=self:Resolve(sight and sight.Instance)
 			if not sight or visible==target then return hit,target,targetKind end
 		end
 		return nil
 	end
-	local hit,target,targetKind=assisted(self.AssistRadius,{self.Towers,self.Units})
-	if target and targetKind~="Mob" then return hit,target,targetKind end
+	local hit,target,targetKind=assisted(self.UnitAssistRadius,{self.Units})
+	if target and targetKind=="Unit" then return hit,target,targetKind end
 
 	return exact,nil,nil
 end
