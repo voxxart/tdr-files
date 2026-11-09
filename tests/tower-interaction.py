@@ -50,11 +50,19 @@ local _,assisted=picker:Pick({X=100,Y=50}); assert(assisted==tower)
 local enemy=node('Model',world.Mobs); enemy.EnemyStats=node('Folder',enemy); enemy.EnemyStats.Health={Value=100}
 local enemyPart=node('Part',enemy); enemyHit={Instance=enemyPart,Distance=10,Position=vector(10)}
 picker.AssistRadius=0.25
-assistHit=nil; hits={wall,enemyHit}
-local _,easyEnemy,easyKind=picker:Pick({X=100,Y=50})
-assert(easyEnemy==enemy and easyKind=='Mob' and radiusUsed==1.25 and picker.AssistRadius==0.25)
-hits={wall,wall}; local _,hiddenEnemy=picker:Pick({X=100,Y=50}); assert(not hiddenEnemy,'enemy assistance must respect walls')
-enemy.Attributes.Dead=true; hits={wall}; assert(select(2,picker:Pick({X=100,Y=50}))==nil)
+assistHit=nil; hits={enemyHit}
+local beforeSphere=sphereCalls
+local _,exactEnemy,exactKind=picker:Pick({X=100,Y=50})
+assert(exactEnemy==enemy and exactKind=='Mob' and sphereCalls==beforeSphere,'visible enemy geometry must resolve without assistance')
+hits={wall}; assistHit=enemyHit
+local _,outside=picker:Pick({X=100,Y=50})
+assert(not outside,'a nearby enemy must not be accepted through an assist cast')
+assistHit=nil
+local card=node('Frame',gui); card.Name='MobHoverGui'; card.Active=true
+local activeChild=node('GuiButton',card); guiObjects={activeChild}; hits={enemyHit}
+assert(select(2,picker:Pick({X=100,Y=50}))==enemy,'tooltip must not block its own hover')
+guiObjects={}; enemy.Attributes.Dead=true; hits={enemyHit}
+assert(select(2,picker:Pick({X=100,Y=50}))==nil)
 enemy.Attributes.Dead=false; enemyHit=nil
 local button=node('GuiButton',gui); guiObjects={button}; local count=rayCalls
 assert(picker:Pick({X=100,Y=50})==nil and rayCalls==count)

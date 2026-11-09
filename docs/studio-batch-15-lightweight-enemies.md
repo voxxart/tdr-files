@@ -81,6 +81,8 @@ Actual engine replication order, rig welding, Motor6Ds, UI hooks, asset pivots, 
 
 ## Enemy hover follow-up
 
-Replace **ModuleScript** `ReplicatedStorage.GameModules.TowerInteraction` and **ModuleScript** `ReplicatedStorage.GameModules.EnemyVisuals` for improved enemy hovering. EnemyAssistRadius defaults to 1.25 studs and is separate from AssistRadius used for the existing general/tower assistance. Preserve your preferred AssistRadius (for example 0.25) if you customized it. Exact hits retain priority, and the extra enemy-only spherecast runs only when ordinary picking misses. UI blocking, dead-enemy filtering, and line-of-sight checks remain in place.
+Replace **ModuleScript** `ReplicatedStorage.GameModules.TowerInteraction` and **ModuleScript** `ReplicatedStorage.GameModules.EnemyVisuals` for direct enemy picking. Enemy hover now uses exact ray hits against the rendered model. EnemyAssistRadius has been removed, and enemies are excluded from the general assist spherecast. Preserve your preferred tower AssistRadius (for example 0.25) if customized.
 
-Lightweight client roots are now queryable in the Default collision group while remaining anchored and noncolliding. This provides a stable hover surface even when decorative meshes are difficult to hit. Server proxies and damage geometry are unchanged. Verify hovering moving/armored enemies, nearby towers, and enemies behind scenery in Studio.
+Visible BaseParts/MeshParts on lightweight client rigs are queryable in the Default collision group while staying noncolliding. Fully transparent parts, including the usual invisible root, are excluded. Server proxies and damage geometry remain unchanged. Passive MobHoverGui/UnitHoverGui/TowerHoverGui descendants cannot block their own world-hover checks; ordinary buttons and panels still block world interaction.
+
+Verify hovering moving/armored enemies by aiming directly at their body, cursor positions outside their silhouette, nearby towers, tooltip clamping at screen edges, and enemies behind scenery. This uses Roblox part/mesh query geometry, not a screen-space bounding box or pixel-perfect rendered alpha test.

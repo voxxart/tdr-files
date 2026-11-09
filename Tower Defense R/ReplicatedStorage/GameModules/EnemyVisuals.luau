@@ -22,11 +22,13 @@ function Visuals.Attach(model)
  clone.PrimaryPart=root; root.Anchored=true
  for _,object in clone:GetDescendants() do
   if object:IsA('Script') or object:IsA('LocalScript') then object:Destroy()
-  elseif object:IsA('BasePart') then object.CanCollide=false; object.CanTouch=false; object.CollisionGroup='Mob' end
+  elseif object:IsA('BasePart') then
+   object.CanCollide=false; object.CanTouch=false
+   -- Exact hover uses visible body geometry, not an enlarged invisible root.
+   object.CanQuery=object.Transparency<1
+   object.CollisionGroup=if object.CanQuery then 'Default' else 'Mob'
+  end
  end
- -- A queryable local root provides a stable central hover surface, independent
- -- of decorative mesh CanQuery flags or the Mob physics collision matrix.
- root.CanQuery=true; root.CollisionGroup='Default'
  clone:PivotTo(proxyRoot.CFrame)
  proxyRoot.Name='EnemyProxyRoot'
  local children={}

@@ -5,13 +5,13 @@ root=Path(__file__).resolve().parents[1]
 paths={'factory':'ServerScriptService/EnemySystem/EnemyProxyFactory.luau','visuals':'ReplicatedStorage/GameModules/EnemyVisuals.luau','rng':'ServerScriptService/EnemyAttacks/Auras/RNG.luau'}
 code='local sources={}\n'+'\n'.join('sources.'+k+'=[====['+(root/'Tower Defense R'/v).read_text()+']====]' for k,v in paths.items())+r'''
 local function node(class,name)
- local n={Class=class,Name=name or class,Children={},Attributes={},Tags={},Value=0,CFrame={},Size={}}
+ local n={Class=class,Name=name or class,Children={},Attributes={},Tags={},Value=0,CFrame={},Size={},Transparency=0}
  setmetatable(n,{__index=function(self,key) if key=='Parent' then return rawget(self,'_Parent') end local raw=rawget(self,key); if raw~=nil then return raw end; for _,child in self.Children do if child.Name==key then return child end end end,
  __newindex=function(self,key,value)
   if key=='Parent' then local old=rawget(self,'_Parent'); if old then old.Children[self]=nil end; rawset(self,'_Parent',value); if value then value.Children[self]=self end
   else rawset(self,key,value) end
  end})
- function n:IsA(kind) return self.Class==kind or kind=='BasePart' and self.Class=='Part' or kind=='ValueBase' and self.Class=='NumberValue' end
+ function n:IsA(kind) return self.Class==kind or kind=='BasePart' and (self.Class=='Part' or self.Class=='MeshPart') or kind=='ValueBase' and self.Class=='NumberValue' end
  function n:FindFirstChild(key) for _,child in self.Children do if child.Name==key then return child end end end
  function n:GetChildren() local out={} for _,c in self.Children do table.insert(out,c) end return out end
  function n:GetDescendants() local out={} for _,c in self.Children do table.insert(out,c); for _,d in c:GetDescendants() do table.insert(out,d) end end return out end
@@ -21,7 +21,7 @@ local function node(class,name)
  function n:Destroy() self.Parent=nil; self.Destroyed=true end
  function n:PivotTo(cf) self.PrimaryPart.CFrame=cf end
  function n:Clone()
-  local copy=node(self.Class,self.Name); copy.Value=self.Value; copy.Size=self.Size; copy.CFrame=self.CFrame
+  local copy=node(self.Class,self.Name); copy.Value=self.Value; copy.Size=self.Size; copy.CFrame=self.CFrame; copy.Transparency=self.Transparency
   for key,value in pairs(self.Attributes) do copy.Attributes[key]=value end
   for _,c in self.Children do local child=c:Clone(); child.Parent=copy end
   if self.PrimaryPart then copy.PrimaryPart=copy[self.PrimaryPart.Name] end
@@ -32,8 +32,8 @@ end
 local function add(parent,class,name) local n=node(class,name); n.Parent=parent; return n end
 local function template()
  local m=node('Model','Noob'); m.Attributes.Custom=42
- local root=add(m,'Part','HumanoidRootPart'); m.PrimaryPart=root
- add(m,'Part','Hitbox'); add(m,'Part','Head'); add(m,'Part','Torso')
+ local root=add(m,'Part','HumanoidRootPart'); root.Transparency=1; m.PrimaryPart=root
+ add(m,'Part','Hitbox'); add(m,'Part','Head'); add(m,'Part','Torso'); add(m,'MeshPart','Armor').CanQuery=false
  for i=1,20 do add(m,'Part','Detail'..i) end
  local stats=add(m,'Folder','EnemyStats'); add(stats,'NumberValue','Health').Value=100
  add(m,'Folder','Animations'); add(m,'AnimationController','AnimationController'); add(m,'NumberValue','Alpha')
@@ -53,9 +53,10 @@ assert(proxy.HumanoidRootPart.Transparency==1 and not proxy.Hitbox.CanCollide)
 assert(source.Head and source.HumanoidRootPart.Name=='HumanoidRootPart','factory must not modify asset')
 local stats=proxy.EnemyStats; local root=proxy.HumanoidRootPart
 assert(Visuals.Attach(proxy))
+assert(proxy.Armor.CanQuery and proxy.Armor.CollisionGroup=='Default')
 assert(proxy.EnemyStats==stats and proxy.Head and proxy.Torso and proxy.Animations and proxy.AnimationController)
 assert(proxy.EnemyProxyRoot==root and proxy.PrimaryPart==proxy.HumanoidRootPart and proxy.PrimaryPart~=root)
-assert(proxy.PrimaryPart.CanQuery and proxy.PrimaryPart.CollisionGroup=='Default' and not proxy.PrimaryPart.CanCollide)
+assert(not proxy.PrimaryPart.CanQuery and proxy.Head.CanQuery and proxy.Head.CollisionGroup=='Default' and not proxy.Head.CanCollide)
 local count=#proxy:GetDescendants(); assert(Visuals.Attach(proxy) and #proxy:GetDescendants()==count,'duplicate spawn must not duplicate a rig')
 local localRoot=proxy.PrimaryPart
 Visuals.Detach(proxy)

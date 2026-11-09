@@ -2,7 +2,7 @@
 local Players = game:GetService('Players')
 local Interaction = {}
 Interaction.AssistRadius = 0.75
-Interaction.EnemyAssistRadius = 1.25
+local passiveTooltips = {MobHoverGui=true, UnitHoverGui=true, TowerHoverGui=true}
 
 function Interaction.new(world, playerGui)
 	local self = setmetatable({World=world,PlayerGui=playerGui}, {__index=Interaction})
@@ -46,10 +46,14 @@ end
 function Interaction:IsBlocked(position)
 	for _,object in self.PlayerGui:GetGuiObjectsAtPosition(position.X,position.Y) do
 		local current=object
+		local blocks=false
 		while current and current~=self.PlayerGui do
-			if current:IsA('GuiObject') and (current.Active or current:IsA('GuiButton') or current:IsA('TextBox')) then return true end
+			-- Hover cards are presentation, even if an authored child is Active.
+			if passiveTooltips[current.Name] then blocks=false; break end
+			if current:IsA('GuiObject') and (current.Active or current:IsA('GuiButton') or current:IsA('TextBox')) then blocks=true end
 			current=current.Parent
 		end
+		if blocks then return true end
 	end
 	return false
 end
@@ -75,24 +79,22 @@ function Interaction:Pick(position,ignore)
 	if model then return exact,model,kind end
 	local assist=RaycastParams.new()
 	assist.FilterType=Enum.RaycastFilterType.Include; assist.IgnoreWater=true
-	local function assisted(radius,folders,requiredKind)
+	local function assisted(radius,folders)
 		if radius<=0 then return nil end
 		assist.FilterDescendantsInstances=folders
 		local distance=if exact then math.min(1000,exact.Distance+radius) else 1000
 		local hit=self.World:Spherecast(ray.Origin,radius,ray.Direction*distance,assist)
 		local target,targetKind=self:Resolve(hit and hit.Instance)
-		if target and (not requiredKind or targetKind==requiredKind) then
+		if target and targetKind~="Mob" then
 			local sight=self.World:Raycast(ray.Origin,hit.Position-ray.Origin,params)
 			local visible=self:Resolve(sight and sight.Instance)
 			if not sight or visible==target then return hit,target,targetKind end
 		end
 		return nil
 	end
-	local hit,target,targetKind=assisted(self.AssistRadius,{self.Towers,self.Mobs,self.Units})
-	if target then return hit,target,targetKind end
-	-- Enemy assistance is independent of a player's deliberately narrow tower radius.
-	hit,target,targetKind=assisted(self.EnemyAssistRadius,{self.Mobs},'Mob')
-	if target then return hit,target,targetKind end
+	local hit,target,targetKind=assisted(self.AssistRadius,{self.Towers,self.Units})
+	if target and targetKind~="Mob" then return hit,target,targetKind end
+
 	return exact,nil,nil
 end
 
