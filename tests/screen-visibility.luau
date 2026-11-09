@@ -1,0 +1,8 @@
+local V=require('../Tower Defense R/ReplicatedStorage/GameModules/ScreenVisibility')
+assert(V.Contains(0,0,100,2,1920,1080,70,48))
+assert(not V.Contains(1000,0,100,2,1920,1080,70,48))
+assert(not V.Contains(0,0,-10,2,1920,1080,70,48))
+assert(V.Contains(130,0,100,12,1920,1080,70,48),'partially visible bounds should remain active')
+assert(V.Contains(0,0,-1,2,1920,1080,70,48),'near-plane overlap should remain visible')
+assert(not V.Contains(0,0,100,2,0,0,70,48))
+print('Screen visibility passed: center, offscreen, behind camera, edge bounds, near plane, invalid viewport')

@@ -39,6 +39,11 @@ return {
 		RegistrationBudget = 64,
 		RegistrationTimeout = 10,
 		SummonEffectsPerFrame = 8,
+		AnimationVisibilityChecksPerFrame = 1024,
+		AnimationScreenMargin = 48,
+		MaxDeathPresentations = 48,
+		DeathPresentationsPerFrame = 6,
+		DeathParticlesPerEffect = 200,
 
 		BurnTick = 1,
 		BleedTick = 1,

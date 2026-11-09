@@ -36,7 +36,7 @@ local gameSpeed = (GameSpeedValue and GameSpeedValue.Value) or 1
 if GameSpeedValue then
 	GameSpeedValue:GetPropertyChangedSignal("Value"):Connect(function()
 		local v = GameSpeedValue.Value
-		gameSpeed = (v ~= 0 and v) or 1
+		gameSpeed = math.max(v, 0)
 	end)
 end
 
@@ -2297,6 +2297,7 @@ end
 --------------------------------------------------------------------
 
 local AnimationStates = setmetatable({}, { __mode = "k" })
+local enemyAnimationBudget
 -- A request may arrive before Animations/<level>/<name> has replicated.
 -- Keep at most ONE short-lived retry worker per model; the latest request wins.
 local PendingAnimationPlay = setmetatable({}, { __mode = "k" })
@@ -2319,6 +2320,7 @@ local function warmAnimationAsset(animation)
 end
 
 local function warmModelAnimations(object)
+	if enemyAnimationBudget and not enemyAnimationBudget:IsVisible(object) then return end
 	task.delay(0.1, function()
 		if not (object and object.Parent) then return end
 		local folder = object:FindFirstChild("Animations")
@@ -2375,7 +2377,8 @@ local function updateTrackSpeed(object, track, animName)
 		return
 	end
 
-	local speed = math.max(gameSpeed, 0.001)
+	local speed = math.max(gameSpeed, 0)
+	if enemyAnimationBudget and enemyAnimationBudget:IsPaused(object) then speed = 0 end
 
 	if animName == "Walk" or animName == "Walk2" then
 		speed *= SpeedOverrides[object.Name] or 1
@@ -2427,6 +2430,7 @@ local function clearLoadedTracks(state)
 end
 
 local function cleanupAnimationState(object)
+	if enemyAnimationBudget then enemyAnimationBudget:Remove(object) end
 	local state = AnimationStates[object]
 	if not state then
 		return
@@ -2779,7 +2783,6 @@ function setAnimation(object, animName)
 end
 
 local function playLoadedTrack(object, animName, track)
-	updateTrackSpeed(object, track, animName)
 	if track.IsPlaying then
 		-- Restart one-shot attacks, but never freeze Walk/Idle/BeamLoop at
 		-- frame 0 when the server repeats the same loop event.
@@ -2790,6 +2793,8 @@ local function playLoadedTrack(object, animName, track)
 	else
 		track:Play(0)
 	end
+	updateTrackSpeed(object, track, animName)
+	if enemyAnimationBudget then enemyAnimationBudget:Played(object, track, animName) end
 	return track
 end
 
@@ -2810,6 +2815,7 @@ function playAnimation(object, animName, bypassReaperCast)
 		return nil
 	end
 
+	if enemyAnimationBudget and enemyAnimationBudget:Request(object, animName) then return nil end
 	local serial = (AnimationRequestSerial[object] or 0) + 1
 	AnimationRequestSerial[object] = serial
 
@@ -2875,6 +2881,7 @@ end
 -- under a Reaper ability and no other AnimateEnemy animation can interrupt it.
 ------------------------------------------------------------
 local function stopAllModelAnimationTracks(object, fadeTime)
+	if enemyAnimationBudget then enemyAnimationBudget:Stop(object) end
 	PendingAnimationPlay[object] = nil
 	AnimationRequestSerial[object] = (AnimationRequestSerial[object] or 0) + 1
 	local state = AnimationStates[object]
@@ -2969,6 +2976,7 @@ task.spawn(function()
 end)
 
 function StopAnimation(object, animName)
+	if enemyAnimationBudget then enemyAnimationBudget:Stop(object, animName) end
 	local pending = PendingAnimationPlay[object]
 	if pending and pending.Name == animName then
 		PendingAnimationPlay[object] = nil
@@ -2987,6 +2995,7 @@ function StopAnimation(object, animName)
 end
 
 local function pauseModelAnimations(model)
+	if enemyAnimationBudget then enemyAnimationBudget:Pause(model, true) end
 	local state = getAnimationState(model)
 	if not state then
 		return
@@ -3003,6 +3012,7 @@ local function pauseModelAnimations(model)
 end
 
 local function resumeModelAnimations(model)
+	if enemyAnimationBudget then enemyAnimationBudget:Pause(model, false) end
 	local state = AnimationStates[model]
 	if not state then
 		return
@@ -3070,6 +3080,31 @@ end
 local MobsFolder = workspace:WaitForChild("Mobs")
 local UnitsFolder = workspace:WaitForChild("Units")
 local TowersFolder = workspace:WaitForChild("Towers")
+
+local BudgetModule = require(ReplicatedStorage.GameModules:WaitForChild("EnemyAnimationBudget"))
+local animationSettings = require(ReplicatedStorage.GameModules.EnemyData).Settings
+local function enemyFallback(object)
+	playAnimation(object, object:GetAttribute("FrankensteinTransformed") == true and "Walk2" or "Walk")
+end
+enemyAnimationBudget = BudgetModule.new({
+	IsEnemy = function(object) return object.Parent == MobsFolder end,
+	Camera = function() return workspace.CurrentCamera end,
+	Tracks = function(object) local state=AnimationStates[object]; return state and state.Tracks end,
+	Rate = function(object,name) return (name=="Walk" or name=="Walk2") and (SpeedOverrides[object.Name] or 1) or 1 end,
+	Speed = updateTrackSpeed, Play = playAnimation, Fallback = enemyFallback,
+	ChecksPerFrame = animationSettings.AnimationVisibilityChecksPerFrame or 1024,
+	Margin = animationSettings.AnimationScreenMargin or 48,
+})
+local budgetConnection = RunService.RenderStepped:Connect(function(dt) enemyAnimationBudget:Step(dt, gameSpeed) end)
+local budgetRemovalConnection = MobsFolder.ChildRemoved:Connect(function(object)
+	enemyAnimationBudget:Remove(object)
+	cleanupAnimationState(object)
+end)
+script.Destroying:Connect(function()
+	budgetConnection:Disconnect(); budgetRemovalConnection:Disconnect()
+	for object in pairs(AnimationStates) do cleanupAnimationState(object) end
+	enemyAnimationBudget:Clear()
+end)
 
 local function animateMobOnSpawn(object)
 	if object:GetAttribute("ReaperAbilityActive") == true then
