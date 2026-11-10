@@ -7,7 +7,6 @@ local Match=require(game.ServerScriptService.Simulation.MatchService)
 local Wallet=require(script.Parent.Wallet)
 local Store=require(script.Parent.DropStore)
 local Quota=require(script.Parent.Quota)
-local Ground=require(script.Parent.Ground)
 local Service={}
 local store=Store.new(Config.MaxActiveDrops)
 local quota=Quota.new()
@@ -70,19 +69,6 @@ local function cast(origin,direction,params)
  raysLeft-=1
  return workspace:Raycast(origin,direction,params)
 end
-local function clearLanding(hit,map)
- if raysLeft<=0 then return false end
- raysLeft-=1
- local params=OverlapParams.new(); params.FilterType=Enum.RaycastFilterType.Include
- params.FilterDescendantsInstances={map}; params.RespectCanCollide=true
- local radius=math.max(0.05,Config.LandingClearanceRadius or 0.35)
- local height=math.max(0.1,Config.LandingClearanceHeight or 1.5)
- local box=CFrame.new(hit.Position+Vector3.new(0,height/2+0.05,0))
- for _,part in workspace:GetPartBoundsInBox(box,Vector3.new(radius*2,height,radius*2),params) do
-  if part~=hit.Instance then return false end
- end
- return true
-end
 function Service.TryDrop(origin,map,height)
  if not Config.Enabled or not Match.IsCurrent(Match.Capture()) then return false end
  ensureMatch()
@@ -94,8 +80,13 @@ function Service.TryDrop(origin,map,height)
   if not warned then warn('EventCurrency: missing Model/BasePart at ReplicatedStorage.Particle.EventCurrency.Current'); warned=true end
   return false
  end
- local land=Ground.Find(workspace,map,origin,height,random,Config,cast,clearLanding)
- if not land then return false end
+ local angle=random:NextNumber(0,math.pi*2)
+ local radius=random:NextNumber(math.max(0,Config.ScatterMin),math.max(0,Config.ScatterMin,Config.ScatterMax))
+ local candidate=origin+Vector3.new(math.cos(angle)*radius,0,math.sin(angle)*radius)
+ local params=RaycastParams.new(); params.FilterType=Enum.RaycastFilterType.Include
+ params.FilterDescendantsInstances={map}; params.IgnoreWater=true
+ local hit=cast(candidate+Vector3.new(0,12,0),Vector3.new(0,-100,0),params)
+ local land=Vector3.new(candidate.X,(hit and hit.Position.Y or origin.Y-(height or 0))+Config.GroundOffset,candidate.Z)
  local low=math.max(1,math.floor(Config.MinAmount)); local high=math.max(low,math.floor(Config.MaxAmount))
  local amount=random:NextInteger(low,high)
  local amounts={}

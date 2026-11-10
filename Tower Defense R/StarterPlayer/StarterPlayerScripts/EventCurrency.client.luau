@@ -25,6 +25,41 @@ local pickupSound, soundSource, soundRoot
 local warnedBillboard=false
 local warnedOrbs=false
 local lastPickupSound=-math.huge
+local burstAttachment,burstRoot,burstSource
+local burstEmitters={}
+local lastBurst=-math.huge
+local function clearBurst()
+ if burstAttachment then burstAttachment:Destroy() end
+ burstAttachment=nil; burstRoot=nil; burstSource=nil; table.clear(burstEmitters)
+end
+local function emitBurst(root,asset)
+ if Config.PickupBurstCount==0 or os.clock()-lastBurst<(Config.PickupSoundMinInterval or 0.08) then return end
+ if burstRoot~=root or burstSource~=asset or not burstAttachment or not burstAttachment.Parent then
+  clearBurst()
+  burstRoot=root; burstSource=asset; burstAttachment=Instance.new('Attachment'); burstAttachment.Name='EventCurrencyPickupBurst'; burstAttachment.Parent=root
+  if asset then
+   for _,object in asset:GetDescendants() do
+    if object:IsA('ParticleEmitter') and #burstEmitters<4 then
+     local emitter=object:Clone(); emitter.Enabled=false; emitter.Rate=0
+     local lifetime=math.max(0.01,Config.PickupBurstLifetime or 0.45)
+     emitter.Lifetime=NumberRange.new(math.min(object.Lifetime.Min,lifetime),math.min(object.Lifetime.Max,lifetime))
+     emitter.Parent=burstAttachment; table.insert(burstEmitters,emitter)
+    end
+   end
+  end
+  if #burstEmitters==0 then
+   local emitter=Instance.new('ParticleEmitter'); emitter.Enabled=false; emitter.Rate=0
+   local lifetime=math.max(0.01,Config.PickupBurstLifetime or 0.45)
+   emitter.Lifetime=NumberRange.new(math.min(0.25,lifetime),lifetime)
+   emitter.Speed=NumberRange.new(3,7); emitter.Drag=5; emitter.SpreadAngle=Vector2.new(180,180)
+   emitter.Size=NumberSequence.new({NumberSequenceKeypoint.new(0,0.25),NumberSequenceKeypoint.new(1,0)})
+   emitter.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,0.1),NumberSequenceKeypoint.new(1,1)})
+   emitter.Parent=burstAttachment; table.insert(burstEmitters,emitter)
+  end
+ end
+ for _,emitter in burstEmitters do emitter:Emit(math.clamp(Config.PickupBurstCount or 14,0,32)) end
+ lastBurst=os.clock()
+end
 local function running() return info.GameRunning.Value and info.Message.Value~='VICTORY' and info.Message.Value~='GAME OVER' end
 local function add(item) item.Index=#active+1; active[item.Index]=item; byId[item.Id]=item end
 local function remove(item)
@@ -48,6 +83,7 @@ local function pickupFeedback(item)
  local ok,err=pcall(Orbs.Play,'EventDrops',Config.CollectionDuration,Config.CollectionOrbs or 1,from,player)
  if not ok and not warnedOrbs then warn('EventCurrency Orbs presentation failed; update the shared Orbs module:',err); warnedOrbs=true end
  local asset=item.Slot and item.Slot.Asset or Assets.Current(Rep)
+ emitBurst(root,asset)
  local source=asset and asset:FindFirstChild('PickupSound',true)
  if asset and (not source or not source:IsA('Sound')) then source=asset:FindFirstChildWhichIsA('Sound',true) end
  if source and source:IsA('Sound') then
@@ -56,7 +92,7 @@ local function pickupFeedback(item)
    pickupSound=source:Clone(); pickupSound.Name='EventCurrencyPickupSound'; pickupSound.Looped=false; pickupSound.Parent=root
    soundSource=source; soundRoot=root
   end
-  if os.clock()-lastPickupSound>=(Config.PickupSoundMinInterval or 0.08) then pickupSound:Stop(); pickupSound:Play(); lastPickupSound=os.clock() end
+  if os.clock()-lastPickupSound>=(Config.PickupSoundMinInterval or 0.08) then pickupSound:Stop(); pickupSound.PlaybackSpeed=0.95+math.random()*0.1; pickupSound:Play(); lastPickupSound=os.clock() end
  end
  local now=os.clock()
  if popup.Root~=root or now>=popup.Deadline or not popup.Gui or not popup.Gui.Parent then
@@ -72,14 +108,41 @@ local function pickupFeedback(item)
    local particle=Rep:FindFirstChild('Particle'); local template=particle and particle:FindFirstChild('EventCurrencyPickup')
    if template and template:IsA('BillboardGui') then gui=template:Clone(); gui.Name='EventCurrencyPickup'; gui.Parent=root end
   end
-  if gui then gui.Adornee=root; gui.Enabled=true; popup={Gui=gui,Root=root,Total=0,Deadline=now+(Config.PickupDisplaySeconds or 5)}
+  if gui then
+   gui.Adornee=root; gui.Enabled=true
+   popup={Gui=gui,Root=root,Total=0,Displayed=0,From=0,Started=now,Deadline=now+(Config.PickupDisplaySeconds or 5),Fades={}}
+   popup.Label=gui:FindFirstChild('Amount',true)
+   if popup.Label and (popup.Label:IsA('TextLabel') or popup.Label:IsA('TextButton')) then
+    popup.Scale=popup.Label:FindFirstChildWhichIsA('UIScale')
+    if not popup.Scale then popup.Scale=Instance.new('UIScale'); popup.Scale.Name='PickupScale'; popup.Scale.Scale=1; popup.Scale.Parent=popup.Label end
+    popup.BaseScale=popup.Scale.Scale
+   end
+   for _,object in gui:GetDescendants() do
+    if object:IsA('TextLabel') or object:IsA('TextButton') then
+     table.insert(popup.Fades,{Object=object,Property='TextTransparency',Base=object.TextTransparency})
+     table.insert(popup.Fades,{Object=object,Property='TextStrokeTransparency',Base=object.TextStrokeTransparency})
+    elseif object:IsA('UIStroke') then table.insert(popup.Fades,{Object=object,Property='Transparency',Base=object.Transparency}) end
+   end
   elseif not warnedBillboard then warn('EventCurrency: missing BillboardGui ReplicatedStorage.Particle.EventCurrencyPickup'); warnedBillboard=true end
  end
  if popup.Gui then
-  popup.Total+=item.Amount
-  local amount=popup.Gui:FindFirstChild('Amount',true)
-  if amount and (amount:IsA('TextLabel') or amount:IsA('TextButton')) then amount.Text='+'..tostring(popup.Total) end
+  popup.From=popup.Displayed or 0; popup.Total+=item.Amount; popup.Started=now
+  popup.Deadline=now+(Config.PickupDisplaySeconds or 5)
+  for _,entry in popup.Fades do entry.Object[entry.Property]=entry.Base end
  end
+end
+-- One shared frame update, with no per-pickup delayed tasks or tween connections.
+local function animatePopup(now)
+ if not popup.Gui then return end
+ local elapsed=now-popup.Started
+ local count=math.clamp(elapsed/math.max(0.01,Config.PickupCountDuration or 0.3),0,1)
+ popup.Displayed=popup.From+(popup.Total-popup.From)*(1-(1-count)^2)
+ if popup.Label and (popup.Label:IsA('TextLabel') or popup.Label:IsA('TextButton')) then popup.Label.Text='+'..tostring(math.floor(popup.Displayed+0.5)) end
+ local bounce=math.clamp(elapsed/math.max(0.01,Config.PickupBounceDuration or 0.5),0,1)
+ if popup.Scale then popup.Scale.Scale=popup.BaseScale*(1-0.15*math.cos(bounce*math.pi*2)*(1-bounce)^2) end
+ local duration=math.min(Config.PickupFadeDuration or 0.35,Config.PickupDisplaySeconds or 5)
+ local fade=math.clamp((now-(popup.Deadline-duration))/math.max(0.01,duration),0,1)
+ for _,entry in popup.Fades do entry.Object[entry.Property]=entry.Base+(1-entry.Base)*fade end
 end
 local function apply(op)
  if op.Kind=='Spawn' then
@@ -93,7 +156,7 @@ local function apply(op)
   local previous=recentIds[recentCursor]; if previous then collected[previous]=nil end
   recentIds[recentCursor]=op.Id; collected[op.Id]=true; recentCursor=recentCursor%512+1
   local item=byId[op.Id]
-  if item then pickupFeedback(item); remove(item)
+  if item then item.Amount=op.Amount or item.Amount; pickupFeedback(item); remove(item)
   else
    local character=player.Character; local root=character and character:FindFirstChild('HumanoidRootPart')
    if root and op.Amount then pickupFeedback({Amount=op.Amount,Land=root.Position}) end
@@ -108,6 +171,8 @@ connections[#connections+1]=Rep.Events:WaitForChild('EventCurrency').OnClientEve
 connections[#connections+1]=RunService.RenderStepped:Connect(function(dt)
  local character=player.Character; local root=character and character:FindFirstChild('HumanoidRootPart')
  if popup.Gui and (os.clock()>=popup.Deadline or popup.Root~=root or not popup.Gui.Parent) then clearPopup() end
+ animatePopup(os.clock())
+ if burstRoot and burstRoot~=root then clearBurst() end
  if pickupSound and soundRoot~=root then pickupSound:Destroy(); pickupSound=nil; soundRoot=nil; soundSource=nil end
  if not running() or not Config.Enabled then clear(); return end
  local gameDt=dt*math.max(info.GameSpeed.Value,0)
@@ -143,7 +208,7 @@ connections[#connections+1]=info.Message.Changed:Connect(ended)
 script.Destroying:Connect(function()
  alive=false
  for _,connection in connections do connection:Disconnect() end
- clear(); clearPopup(); if pickupSound then pickupSound:Destroy() end
+ clear(); clearPopup(); clearBurst(); if pickupSound then pickupSound:Destroy() end
  pool:Destroy(); visual:Destroy()
 end)
 task.spawn(function()

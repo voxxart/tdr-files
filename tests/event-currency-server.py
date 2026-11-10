@@ -2,7 +2,7 @@
 from pathlib import Path
 import subprocess,tempfile
 root=Path(__file__).resolve().parents[1]
-paths={'service':'ServerScriptService/EventCurrencySystem/Service.luau','wallet':'ServerScriptService/EventCurrencySystem/Wallet.luau','quota':'ServerScriptService/EventCurrencySystem/Quota.luau','ground':'ServerScriptService/EventCurrencySystem/Ground.luau','store':'ServerScriptService/EventCurrencySystem/DropStore.luau','assets':'ReplicatedStorage/GameModules/EventCurrencyAssets.luau','datastore':'ServerScriptService/Datastore.server.luau'}
+paths={'service':'ServerScriptService/EventCurrencySystem/Service.luau','wallet':'ServerScriptService/EventCurrencySystem/Wallet.luau','quota':'ServerScriptService/EventCurrencySystem/Quota.luau','store':'ServerScriptService/EventCurrencySystem/DropStore.luau','assets':'ReplicatedStorage/GameModules/EventCurrencyAssets.luau','datastore':'ServerScriptService/Datastore.server.luau'}
 code='local sources={}\n'+'\n'.join('sources.'+k+'=[====['+(root/'Tower Defense R'/v).read_text()+']====]' for k,v in paths.items())+r'''
 local function signal()
  local s={Entries={}}
@@ -126,6 +126,12 @@ for _=1,3 do assert(service.TryDrop(vec(0,3,0),map,3)); step(0.8) end
 assert(service.GetProgress(p2).Collected==8)
 players.PlayerRemoving:Fire(p2); players.PlayerAdded:Fire(p2)
 assert(not service.TryDrop(vec(0,3,0),map,3),'rejoining the same match must not reset earned quota')
+-- A non-default key must publish the existing saved balance, not match earnings.
+config.CurrencyKey='Pumpkins'; profiles[2].Pumpkins=1234
+wallet.Publish(p2)
+assert(p2.Attributes.EventCurrencyKey=='Pumpkins' and p2.Attributes.EventCurrencyBalance==1234)
+assert(wallet.Credit(p2,7) and profiles[2].Pumpkins==1241 and p2.Attributes.EventCurrencyBalance==1241)
+assert(profiles[2].EventCurrency==35,'changing the currency key must not mutate the old bank')
 print('Event currency server passed: personal claims, duplicate prevention, range/landing checks, caps, pause/expiry, cancellation, zero per-pickup saves, actual datastore load/disconnect persistence')
 '''
 with tempfile.NamedTemporaryFile('w',suffix='.luau') as f:

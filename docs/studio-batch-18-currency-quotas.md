@@ -1,5 +1,7 @@
 # Batch 18: personal event currency quotas and cleaner pickups
 
+**Follow-up:** [batch 19](studio-batch-19-pickup-polish.md) replaces the landing checks, removes Ground, and adds animated pickup feedback. Follow its checklist after this batch.
+
 Install these together. Existing assets, Wallet, DropStore, Orbs, and Datastore scripts from batches 16–17 remain required.
 
 ## Replace existing scripts

@@ -20,7 +20,7 @@ local frame
 frame=function(p) return setmetatable({Position=p,Rotation=rotation,RightVector=vec(1,0,0),UpVector=vec(0,1,0),LookVector=vec(0,0,-1),ToObjectSpace=function(self,b) return frame(b.Position-self.Position) end},{__mul=function(a,b) return frame(a.Position+b.Position) end}) end
 local objects={}; local clones={}
 local function node(class,name)
- local n={Class=class,Name=name or class,Children={},Scale=1,Size=vec(2,2,2),CFrame=frame(vec(0,0,0)),Transparency=0,Changed=signal()}
+ local n={Class=class,Name=name or class,Children={},Scale=1,Size=vec(2,2,2),CFrame=frame(vec(0,0,0)),Transparency=0,TextTransparency=0,TextStrokeTransparency=1,Changed=signal()}
  table.insert(objects,n)
  setmetatable(n,{__index=function(self,key) if key=='Parent' then return rawget(self,'_Parent') end; local raw=rawget(self,key); if raw~=nil then return raw end; for _,child in self.Children do if child.Name==key then return child end end end,
  __newindex=function(self,key,value)
@@ -37,10 +37,11 @@ local function node(class,name)
  function n:GetExtentsSize() return vec(2,2,2) end
  function n:GetPivot() return (self.PrimaryPart and self.PrimaryPart.CFrame) or self.CFrame end
  function n:Destroy() self.Parent=nil; self.Destroyed=true end
+ function n:Emit(count) self.EmitCalls=(self.EmitCalls or 0)+1; self.LastEmit=count end
  function n:Stop() self.IsPlaying=false end
  function n:Play() self.IsPlaying=true; self.PlayCalls=(self.PlayCalls or 0)+1 end
  function n:Clone()
-  local copy=node(self.Class,self.Name); copy.Transparency=self.Transparency; copy.CFrame=self.CFrame; copy.Size=self.Size
+  local copy=node(self.Class,self.Name); copy.Transparency=self.Transparency; copy.CFrame=self.CFrame; copy.Size=self.Size; copy.TextTransparency=self.TextTransparency; copy.TextStrokeTransparency=self.TextStrokeTransparency
   for _,child in self.Children do local cloned=child:Clone(); cloned.Parent=copy end
   if self.PrimaryPart then copy.PrimaryPart=copy:FindFirstChild(self.PrimaryPart.Name) end
   if self.Class=='Model' then table.insert(clones,copy) end
@@ -72,7 +73,7 @@ function snapshot:InvokeServer()
  return {spawn(99)}
 end
 local env=setmetatable({workspace=world,script={Destroying=destroy},Instance={new=node},Vector3={new=vec},CFrame={new=frame,Angles=function() error('ground currency must not spin') end},
- UDim2={fromOffset=function(...) return {...} end,fromScale=function(...) return {...} end},Color3={new=function(...) return {...} end},
+ UDim2={fromOffset=function(...) return {...} end,fromScale=function(...) return {...} end},Color3={new=function(...) return {...} end},Vector2={new=function(...) return {...} end},NumberRange={new=function(...) return {...} end},NumberSequence={new=function(...) return {...} end},NumberSequenceKeypoint={new=function(...) return {...} end},
  Enum={HighlightDepthMode={AlwaysOnTop=1},Font={GothamBold=1},BulkMoveMode={FireCFrameChanged=1}},task={spawn=function(fn) fn() end},os={clock=function() return wall end},
  game={GetService=function(_,key) if key=='ReplicatedStorage' then return rep elseif key=='RunService' then return {RenderStepped=render} else return {LocalPlayer=player} end end}},{__index=getfenv()})
 local function load(id) if loaded[id] then return loaded[id] end; local fn=assert(loadstring(sources[id])); setfenv(fn,env); loaded[id]=fn(); return loaded[id] end
@@ -91,15 +92,23 @@ step(0.2); assert(coin.Position.Y==1)
 step(0.5); assert(coin.Position.Y==1 and coin.CFrame.Rotation==rotation,'settled currency must be stationary')
 remote.OnClientEvent:Fire({{Kind='Collect',Id=1,Player=player,Amount=3}})
 assert(#orbCalls==1 and orbCalls[1][1]=='EventDrops' and orbCalls[1][3]==1)
+step(0.1)
+local animated=rootPart:FindFirstChild('EventCurrencyPickup'); local displayed=tonumber(animated.Amount.Text:sub(2)); assert(displayed>0 and displayed<3,'counter should interpolate instead of jumping'); assert(animated.Amount.PickupScale.Scale~=1,'pickup should animate the existing label scale')
+step(0.2)
 local gui=rootPart:FindFirstChild('EventCurrencyPickup'); assert(gui and gui.Amount.Text=='+3' and gui.Adornee==rootPart)
 local sound=rootPart:FindFirstChild('EventCurrencyPickupSound'); assert(sound and sound.PlayCalls==1)
 local nextDrop=spawn(3); nextDrop.Amount=9; nextDrop.Amounts={['1']=4,['2']=9}; remote.OnClientEvent:Fire({nextDrop}); step(0.1)
 remote.OnClientEvent:Fire({{Kind='Collect',Id=3,Player=player,Amount=4}})
+step(0.3)
 assert(rootPart:FindFirstChild('EventCurrencyPickup')==gui and gui.Amount.Text=='+7' and sound.PlayCalls==2)
+local burst=rootPart:FindFirstChild('EventCurrencyPickupBurst'); assert(burst and #burst:GetChildren()==1 and burst:GetChildren()[1].EmitCalls==2,'reuse a bounded particle emitter for successive pickups')
 local guiCount=0; for _,child in rootPart:GetChildren() do if child.Name=='EventCurrencyPickup' then guiCount+=1 end end; assert(guiCount==1)
-step(4.8); assert(gui.Parent==rootPart and gui.Amount.Text=='+7')
-step(0.2); assert(not gui.Parent,'billboard expires five seconds after first pickup')
+step(4.4); assert(gui.Parent==rootPart and gui.Amount.Text=='+7' and gui.Amount.TextTransparency>0,'popup must fade near its refreshed deadline')
+remote.OnClientEvent:Fire({{Kind='Collect',Id=400,Amount=1}}); step(0.3)
+assert(rootPart:FindFirstChild('EventCurrencyPickup')==gui and gui.Amount.Text=='+8' and gui.Amount.TextTransparency==0,'a pickup during fade must reuse and restore the popup')
+step(4.71); assert(not gui.Parent,'billboard expires five seconds after latest pickup')
 remote.OnClientEvent:Fire({{Kind='Collect',Id=4,Amount=2}})
+step(0.3)
 local later=rootPart:FindFirstChild('EventCurrencyPickup'); assert(later~=gui and later.Amount.Text=='+2')
 local calls=#orbCalls; remote.OnClientEvent:Fire({{Kind='Collect',Id=4,Amount=2}}); assert(#orbCalls==calls and later.Amount.Text=='+2')
 remote.OnClientEvent:Fire({spawn(5)}); step(0.1); assert(#clones==1,'ground model must be reused')
@@ -121,7 +130,7 @@ local rendered=clones[#clones]; assert(rendered.Body.CFrame.Position.Y-rendered.
 destroy:Fire(); assert(simpleClones[1].Destroyed and later.Destroyed and sound.Destroyed)
 for _,object in clones do assert(object.Destroyed) end
 for _,entry in remote.OnClientEvent.Entries do assert(not entry.Connected) end
-print('Event currency client passed: three decaying bounces, stationary rest, no ground label, Orbs API, pickup sound, one accumulating five-second billboard, pooling and cleanup')
+print('Event currency client passed: three decaying bounces, stationary rest, no ground label, Orbs API, pickup sound, one animated accumulating billboard with refreshed deadline, pooled pickup burst, pooling and cleanup')
 '''
 with tempfile.NamedTemporaryFile('w',suffix='.luau') as f:
  f.write(code); f.flush(); subprocess.run(['/workspace/tools/luau-0.745/luau',f.name],check=True,cwd=root)
