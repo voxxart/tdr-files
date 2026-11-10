@@ -67,9 +67,9 @@ rep.Modules.BezierPath='bezier'; rep.GameModules.EnemyData='data'; rep.GameModul
 local codecModule=assert(loadstring(codecSource))()
 local data={Settings={PathSampleCount=4,RegistrationBudget=64,RegistrationTimeout=10}}
 local render=signal()
-local env=setmetatable({workspace=world,game={GetService=function(_,key)
- if key=='Workspace' then return world elseif key=='ReplicatedStorage' then return rep elseif key=='RunService' then return {PreRender=render} else return {} end
-end},Vector3={new=vec},CFrame={new=frame,lookAt=function(p) return frame(p) end},Enum={BulkMoveMode={FireCFrameChanged=1}},
+local env=setmetatable({script={Destroying=signal()},workspace=world,game={GetService=function(_,key)
+ if key=='Workspace' then return world elseif key=='ReplicatedStorage' then return rep elseif key=='RunService' then return {BindToRenderStep=function(_,_,priority,fn) assert(priority==210); render:Connect(fn) end,UnbindFromRenderStep=function() end} else return {} end
+end},Vector3={new=vec},CFrame={new=frame,lookAt=function(p) return frame(p) end},Enum={RenderPriority={Camera={Value=200}},BulkMoveMode={FireCFrameChanged=1}},
  require=function(id) if id=='bezier' then return bezier elseif id=='data' then return data elseif id=='visuals' then return {Attach=function() return true end,Detach=function() end,BeginFrame=function() end} else assert(id=='codec'); return codecModule end end,
  os={clock=function() return wall end}},{__index=getfenv()})
 local function enemy(id,far)

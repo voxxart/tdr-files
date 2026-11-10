@@ -499,7 +499,9 @@ local function applySync(id,alpha,speed,sequence,timestamp)
 end
 EnemySync.OnClientEvent:Connect(function(packet) SyncCodec.Decode(packet,applySync) end)
 
-RunService.PreRender:Connect(function(dt)
+local renderBinding='EnemyRenderer'
+script.Destroying:Connect(function() RunService:UnbindFromRenderStep(renderBinding) end)
+RunService:BindToRenderStep(renderBinding,Enum.RenderPriority.Camera.Value+10,function(dt)
 	if not running() then clearRenderer(); return end
 	EnemyVisuals.BeginFrame()
 	processPending()

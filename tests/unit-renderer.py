@@ -40,9 +40,10 @@ local info={GameSpeed={Value=1},GameRunning={Changed=signal()},Message={Changed=
 local workspace={Info=info,Units={ChildRemoved=signal()}}
 local rep=node({Modules={BezierPath='bezier'},GameModules={UnitDefinitions='definitions'},Events=events})
 local environment=setmetatable({
+    script={Destroying=signal()},Enum={RenderPriority={Camera={Value=200}}},
     game={GetService=function(_,name)
         if name=='ReplicatedStorage' then return rep end
-        if name=='RunService' then return {RenderStepped=render} end
+        if name=='RunService' then return {BindToRenderStep=function(_,_,priority,fn) assert(priority==211); render:Connect(fn) end,UnbindFromRenderStep=function() end} end
         error(name)
     end},
     workspace=workspace,Vector3={new=vec,zero=vec(0,0,0)},

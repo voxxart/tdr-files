@@ -3798,7 +3798,10 @@ local TOWER_SWAY = 60
 local PrevPos = CFrame.new()
 local SWAY_FACTOR = 0.25 -- tweak this to match old feel
 
-RunService.RenderStepped:Connect(function()
+-- Pick after client enemy/unit movement and camera updates for this frame.
+local hoverRenderName = 'GameInteraction_' .. HttpService:GenerateGUID(false)
+script.Destroying:Connect(function() RunService:UnbindFromRenderStep(hoverRenderName) end)
+RunService:BindToRenderStep(hoverRenderName, Enum.RenderPriority.Last.Value, function()
 	if GameWrapUp and towerToSpawn then RemovePlaceholderTower() end
 	if selectedTower and (not interaction:Resolve(selectedTower) or GameWrapUp) then
 		selectedTower = nil

@@ -244,7 +244,9 @@ local function render(newUnit,data,dt)
 		end
 	data.T=T
 end
-RunService.RenderStepped:Connect(function(dt)
+local renderBinding='UnitReplicator'
+script.Destroying:Connect(function() RunService:UnbindFromRenderStep(renderBinding) end)
+RunService:BindToRenderStep(renderBinding,Enum.RenderPriority.Camera.Value+11,function(dt)
 	clientTime += dt*math.max(workspace.Info.GameSpeed.Value,0)
 	for model,data in pairs(activeUnits) do
 		local ok,err=pcall(render,model,data,dt)
