@@ -68,6 +68,7 @@ local _,blocked=picker:Pick({X=100,Y=50}); assert(not blocked,'wall must block a
 hits={wall}; assistHit=hit
 local _,assisted=picker:Pick({X=100,Y=50}); assert(not assisted,'tower hover must not use assistance')
 local border=node('Part',tower); border.Name='Border'; border.Transparency=1
+border.CanQuery=true; world.Towers.DescendantAdded:Fire(border); assert(not border.CanQuery,'tower placement borders must not consume the query budget')
 local borderHit={Instance=border,Distance=19,Position=vector(19)}
 local hidden=node('Part',tower); hidden.Transparency=1
 local hiddenHit={Instance=hidden,Distance=19.5,Position=vector(19.5)}

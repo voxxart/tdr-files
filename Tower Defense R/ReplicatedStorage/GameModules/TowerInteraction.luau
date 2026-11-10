@@ -28,8 +28,12 @@ function Interaction.new(world, playerGui)
  self.Params.RespectCanCollide=false
  self.Connections={}
  local function prepare(part)
-  if not part:IsA('BasePart') or part.CanQuery then return end
-  local owner=self:Owner(part)
+  if not part:IsA('BasePart') then return end
+  local owner,kind=self:Owner(part)
+  -- Tower placement borders overlap nearby towers. Remove these permanent
+  -- helpers from local queries instead of spending recasts on every border.
+  if kind=='Tower' and helperNames[part.Name] then part.CanQuery=false; return end
+  if part.CanQuery then return end
   -- Correct authored non-queryable body parts locally, without touching physics.
   if owner and visiblePart(part,owner) then part.CanQuery=true end
  end
