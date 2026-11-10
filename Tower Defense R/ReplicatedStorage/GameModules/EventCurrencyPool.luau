@@ -37,7 +37,13 @@ function Pool:Acquire(asset,scale)
  local pivot=slot.Object:GetPivot()
  slot.Rotation=slot.Rotation or pivot.Rotation
  for _,entry in slot.Parts do entry.Offset=pivot:ToObjectSpace(entry.Part.CFrame); entry.Part.Transparency=entry.Transparency end
- slot.Height=(slot.Object:IsA('Model') and slot.Object:GetExtentsSize().Y or slot.Object.Size.Y)/2
+ local bottom=math.huge
+ for _,entry in slot.Parts do
+  local cf,size=entry.Part.CFrame,entry.Part.Size
+  local extent=(math.abs(cf.RightVector.Y)*size.X+math.abs(cf.UpVector.Y)*size.Y+math.abs(cf.LookVector.Y)*size.Z)/2
+  bottom=math.min(bottom,cf.Position.Y-extent)
+ end
+ slot.Height=pivot.Position.Y-bottom
  slot.Highlight.Enabled=true
  slot.Object.Parent=self.Parent
  slot.InUse=true

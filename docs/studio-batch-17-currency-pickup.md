@@ -79,3 +79,5 @@ The updated Orbs module supports both the existing farm Part assets and folder/m
 - [ ] Profile a mass collection using your real orb asset. Resource caps bound counts; asset complexity and continuous particle/trail content still affect GPU cost.
 
 Automated validation: all 184 game files compile; 22 Luau tests and 16 Python fixtures pass. Updated tests exercise three bounce peaks and stationary rest, no ground label, the Orbs call, sound reuse, one popup accumulating +3/+7, fixed five-second expiration, duplicate collection handling, and cleanup. The actual shared Orbs module is also tested for old farm calls, folder/model assets, batching, target movement, fade/reuse, resource caps, and removed-character cleanup. Engine appearance, sound assets and BillboardGui layout require Studio verification.
+
+See [batch 18](studio-batch-18-currency-quotas.md) for per-mode personal quotas, the balance HUD, and floor landing updates.

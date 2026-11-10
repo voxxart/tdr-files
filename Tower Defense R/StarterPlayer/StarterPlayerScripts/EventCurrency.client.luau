@@ -24,6 +24,7 @@ local popup={Total=0,Deadline=0}
 local pickupSound, soundSource, soundRoot
 local warnedBillboard=false
 local warnedOrbs=false
+local lastPickupSound=-math.huge
 local function running() return info.GameRunning.Value and info.Message.Value~='VICTORY' and info.Message.Value~='GAME OVER' end
 local function add(item) item.Index=#active+1; active[item.Index]=item; byId[item.Id]=item end
 local function remove(item)
@@ -55,7 +56,7 @@ local function pickupFeedback(item)
    pickupSound=source:Clone(); pickupSound.Name='EventCurrencyPickupSound'; pickupSound.Looped=false; pickupSound.Parent=root
    soundSource=source; soundRoot=root
   end
-  pickupSound:Stop(); pickupSound:Play()
+  if os.clock()-lastPickupSound>=(Config.PickupSoundMinInterval or 0.08) then pickupSound:Stop(); pickupSound:Play(); lastPickupSound=os.clock() end
  end
  local now=os.clock()
  if popup.Root~=root or now>=popup.Deadline or not popup.Gui or not popup.Gui.Parent then
@@ -85,7 +86,7 @@ local function apply(op)
   if not running() or byId[op.Id] or (op.Recipients and not (op.Recipients[tostring(player.UserId)] or op.Recipients[player.UserId])) then return end
   if snapshotPending and removedDuringSnapshot[op.Id] then return end
   if #active>=Config.MaxClientVisuals then return end
-  add({Id=op.Id,From=op.From,Land=op.Land,Amount=op.Amount,Age=op.Age or 0,Lifetime=op.Lifetime,Bounces=op.Bounces or (2+op.Id%2)})
+  add({Id=op.Id,From=op.From,Land=op.Land,Amount=(op.Amounts and (op.Amounts[tostring(player.UserId)] or op.Amounts[player.UserId])) or op.Amount,Age=op.Age or 0,Lifetime=op.Lifetime,Bounces=op.Bounces or (2+op.Id%2)})
  elseif op.Kind=='Collect' then
   if snapshotPending then removedDuringSnapshot[op.Id]=true end
   if collected[op.Id] then return end

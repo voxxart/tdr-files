@@ -2,7 +2,7 @@
 from pathlib import Path
 import subprocess,tempfile
 root=Path(__file__).resolve().parents[1]
-paths={'service':'ServerScriptService/EventCurrencySystem/Service.luau','wallet':'ServerScriptService/EventCurrencySystem/Wallet.luau','store':'ServerScriptService/EventCurrencySystem/DropStore.luau','assets':'ReplicatedStorage/GameModules/EventCurrencyAssets.luau','datastore':'ServerScriptService/Datastore.server.luau'}
+paths={'service':'ServerScriptService/EventCurrencySystem/Service.luau','wallet':'ServerScriptService/EventCurrencySystem/Wallet.luau','quota':'ServerScriptService/EventCurrencySystem/Quota.luau','ground':'ServerScriptService/EventCurrencySystem/Ground.luau','store':'ServerScriptService/EventCurrencySystem/DropStore.luau','assets':'ReplicatedStorage/GameModules/EventCurrencyAssets.luau','datastore':'ServerScriptService/Datastore.server.luau'}
 code='local sources={}\n'+'\n'.join('sources.'+k+'=[====['+(root/'Tower Defense R'/v).read_text()+']====]' for k,v in paths.items())+r'''
 local function signal()
  local s={Entries={}}
@@ -46,10 +46,11 @@ end
 local p1,p2=player(1,100),player(2,100); roster={p1,p2}
 local beat=signal(); local now,generation=0,1
 local running=true
-local world=node('Workspace'); world.Info={GameSpeed={Value=1}}
-function world:Raycast(origin) return {Position=vec(origin.X,0,origin.Z)} end
+local world=node('Workspace'); world.Info=node('Folder','Info'); world.Info.GameSpeed={Value=1}
+function world:Raycast(origin) return {Position=vec(origin.X,0,origin.Z),Normal=vec(0,1,0)} end
+function world:GetPartBoundsInBox() return {} end
 local match={Capture=function() return generation end,Now=function() return now end,IsCurrent=function(g) return running and g==generation end}
-local config={Enabled=true,CurrencyKey='EventCurrency',DropChance=1,MinAmount=3,MaxAmount=3,Lifetime=10,PickupRadius=6,LaunchDuration=0.5,BounceDuration=0.2,ScatterMin=0,ScatterMax=0,GroundOffset=0,MaxActiveDrops=2,PickupHz=10}
+local config={QuotasEnabled=false,Enabled=true,CurrencyKey='EventCurrency',DropChance=1,MinAmount=3,MaxAmount=3,Lifetime=10,PickupRadius=6,LaunchDuration=0.5,BounceDuration=0.2,ScatterMin=0,ScatterMax=0,GroundOffset=0,MaxActiveDrops=2,PickupHz=10}
 local profiles={[1]={Coins=100,EventCurrency=10},[2]={Coins=200}}
 local writes=0; local stored={}
 local db={GetAsync=function(_,id) return profiles[id] end,UpdateAsync=function(_,id,fn) writes+=1; stored[id]=fn() end}
@@ -60,8 +61,8 @@ function game:GetService(key)
  elseif key=='DataStoreService' then return {GetDataStore=function() return db end} end
 end
 function game:BindToClose(fn) self.Closing=fn end
-local parent={Wallet='wallet',DropStore='store'}
-local env=setmetatable({game=game,workspace=world,script={Parent=parent},_G={},Instance={new=node},Vector3={new=vec},RaycastParams={new=function() return {} end},Enum={RaycastFilterType={Include=1}},
+local parent={Wallet='wallet',DropStore='store',Quota='quota',Ground='ground'}
+local env=setmetatable({game=game,workspace=world,script={Parent=parent},_G={},Instance={new=node},Vector3={new=vec},CFrame={new=function(p) return {Position=p} end},OverlapParams={new=function() return {} end},RaycastParams={new=function() return {} end},Enum={RaycastFilterType={Include=1}},
  Random={new=function() return {NextNumber=function(_,a,b) return a or 0 end,NextInteger=function(_,a) return a end} end},task={spawn=function() end,wait=function() end}},{__index=getfenv()})
 local function load(id) if loaded[id] then return loaded[id] end; local fn=assert(loadstring(assert(sources[id],id))); setfenv(fn,env); local result=fn(); loaded[id]=result; return result end
 env.require=load
@@ -98,6 +99,33 @@ config.DropChance=0; assert(not service.TryDrop(vec(0,3,0),map,3)); config.DropC
 players.PlayerRemoving:Fire(p1)
 assert(writes==1 and stored[1].EventCurrency==16 and stored[1].Coins==100 and env._G.DataStore.GetPlayerData(p1)==nil)
 assert(not wallet.Dirty(p1))
+roster={p2}
+config.QuotasEnabled=true; config.ModeQuotas={Easy=8,Normal=13,Hard=17}; config.CompleteQuotaOnVictory=true
+generation+=1; service.BeginMatch('Easy',generation)
+assert(service.TryDrop(vec(0,3,0),map,3)); assert(service.TryDrop(vec(0,3,0),map,3))
+p2.Character.HumanoidRootPart.Position=vec(0,1,0); step(0.8)
+assert(service.GetProgress(p2).Collected==6)
+assert(service.TryDrop(vec(0,3,0),map,3))
+local personalDrop=events.EventCurrencySnapshot.OnServerInvoke(p2)
+assert(#personalDrop==1 and personalDrop[1].Amounts['2']==2,'last pile must be trimmed to remaining quota')
+step(0.8); assert(service.GetProgress(p2).Collected==8 and profiles[2].EventCurrency==14)
+assert(not service.TryDrop(vec(0,3,0),map,3) and service.CompleteVictory(generation)==0)
+generation+=1; service.BeginMatch('Normal',generation)
+p2.Character.HumanoidRootPart.Position=vec(100,1,0)
+assert(service.TryDrop(vec(0,3,0),map,3)); step(11); assert(service.GetProgress(p2).Outstanding==0)
+assert(service.TryDrop(vec(0,3,0),map,3)); p2.Character.HumanoidRootPart.Position=vec(0,1,0); step(0.8)
+assert(service.GetProgress(p2).Collected==3)
+assert(service.TryDrop(vec(0,3,0),map,3))
+assert(service.CompleteVictory(generation)==10 and service.CompleteVictory(generation)==0)
+assert(profiles[2].EventCurrency==27 and service.GetDiagnostics().ActiveDrops==0,'victory fills the shortfall once, cancelling outstanding piles')
+generation+=1; service.BeginMatch('Hard',generation)
+assert(service.TryDrop(vec(0,3,0),map,3)); running=false; step(0.1)
+assert(profiles[2].EventCurrency==27,'defeat must not top up the quota')
+running=true; generation+=1; service.BeginMatch('Easy',generation)
+for _=1,3 do assert(service.TryDrop(vec(0,3,0),map,3)); step(0.8) end
+assert(service.GetProgress(p2).Collected==8)
+players.PlayerRemoving:Fire(p2); players.PlayerAdded:Fire(p2)
+assert(not service.TryDrop(vec(0,3,0),map,3),'rejoining the same match must not reset earned quota')
 print('Event currency server passed: personal claims, duplicate prevention, range/landing checks, caps, pause/expiry, cancellation, zero per-pickup saves, actual datastore load/disconnect persistence')
 '''
 with tempfile.NamedTemporaryFile('w',suffix='.luau') as f:

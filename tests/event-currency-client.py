@@ -17,7 +17,7 @@ vm.__sub=function(a,b) return vec(a.X-b.X,a.Y-b.Y,a.Z-b.Z) end
 vm.__mul=function(a,b) return vec(a.X*b,a.Y*b,a.Z*b) end
 local rotation=setmetatable({Position=vec(0,0,0)},{__mul=function(a,b) return b end})
 local frame
-frame=function(p) return setmetatable({Position=p,Rotation=rotation,ToObjectSpace=function(self,b) return frame(b.Position-self.Position) end},{__mul=function(a,b) return frame(a.Position+b.Position) end}) end
+frame=function(p) return setmetatable({Position=p,Rotation=rotation,RightVector=vec(1,0,0),UpVector=vec(0,1,0),LookVector=vec(0,0,-1),ToObjectSpace=function(self,b) return frame(b.Position-self.Position) end},{__mul=function(a,b) return frame(a.Position+b.Position) end}) end
 local objects={}; local clones={}
 local function node(class,name)
  local n={Class=class,Name=name or class,Children={},Scale=1,Size=vec(2,2,2),CFrame=frame(vec(0,0,0)),Transparency=0,Changed=signal()}
@@ -40,8 +40,9 @@ local function node(class,name)
  function n:Stop() self.IsPlaying=false end
  function n:Play() self.IsPlaying=true; self.PlayCalls=(self.PlayCalls or 0)+1 end
  function n:Clone()
-  local copy=node(self.Class,self.Name); copy.Transparency=self.Transparency
+  local copy=node(self.Class,self.Name); copy.Transparency=self.Transparency; copy.CFrame=self.CFrame; copy.Size=self.Size
   for _,child in self.Children do local cloned=child:Clone(); cloned.Parent=copy end
+  if self.PrimaryPart then copy.PrimaryPart=copy:FindFirstChild(self.PrimaryPart.Name) end
   if self.Class=='Model' then table.insert(clones,copy) end
   return copy
  end
@@ -92,7 +93,7 @@ remote.OnClientEvent:Fire({{Kind='Collect',Id=1,Player=player,Amount=3}})
 assert(#orbCalls==1 and orbCalls[1][1]=='EventDrops' and orbCalls[1][3]==1)
 local gui=rootPart:FindFirstChild('EventCurrencyPickup'); assert(gui and gui.Amount.Text=='+3' and gui.Adornee==rootPart)
 local sound=rootPart:FindFirstChild('EventCurrencyPickupSound'); assert(sound and sound.PlayCalls==1)
-local nextDrop=spawn(3); nextDrop.Amount=4; remote.OnClientEvent:Fire({nextDrop}); step(0.1)
+local nextDrop=spawn(3); nextDrop.Amount=9; nextDrop.Amounts={['1']=4,['2']=9}; remote.OnClientEvent:Fire({nextDrop}); step(0.1)
 remote.OnClientEvent:Fire({{Kind='Collect',Id=3,Player=player,Amount=4}})
 assert(rootPart:FindFirstChild('EventCurrencyPickup')==gui and gui.Amount.Text=='+7' and sound.PlayCalls==2)
 local guiCount=0; for _,child in rootPart:GetChildren() do if child.Name=='EventCurrencyPickup' then guiCount+=1 end end; assert(guiCount==1)
@@ -112,6 +113,11 @@ function simple:Clone() local copy=originalClone(self); table.insert(simpleClone
 info.GameRunning.Value=true
 remote.OnClientEvent:Fire({spawn(200)}); step(0.1)
 assert(#simpleClones==1 and not simpleClones[1]:FindFirstChild('RemoveMe') and not simpleClones[1].CanQuery)
+simple.Name='PreviousPart'
+local offcenter=add(folder,'Model','Current'); local pivotPart=add(offcenter,'Part','Pivot'); pivotPart.CFrame=frame(vec(0,10,0)); offcenter.PrimaryPart=pivotPart
+local bottomPart=add(offcenter,'Part','Body'); bottomPart.CFrame=frame(vec(0,8,0))
+local settled=spawn(201); settled.Age=2; remote.OnClientEvent:Fire({settled}); step(0.1)
+local rendered=clones[#clones]; assert(rendered.Body.CFrame.Position.Y-rendered.Body.Size.Y/2==0,'off-center asset pivots must place the actual model bottom on the floor')
 destroy:Fire(); assert(simpleClones[1].Destroyed and later.Destroyed and sound.Destroyed)
 for _,object in clones do assert(object.Destroyed) end
 for _,entry in remote.OnClientEvent.Entries do assert(not entry.Connected) end

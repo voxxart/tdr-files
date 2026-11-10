@@ -22,6 +22,7 @@ local s = workspace.Info.Sec
 local st = workspace.Info.SkipTime
 
 local Match = require(game.ServerScriptService.Simulation.MatchService)
+local EventCurrency = require(game.ServerScriptService.EventCurrencySystem.Service)
 local round = {}
 local votes = {}
 local ModifierVotes = {}
@@ -45,6 +46,7 @@ function round.StartGame()
 	end
 	info.Message.Value = ""
 	local generation = Match.Begin()
+	EventCurrency.BeginMatch(mode, generation)
 
 
 	for i = 12, 0, -1 do
@@ -79,6 +81,7 @@ function round.StartGame()
 		until #workspace.Mobs:GetChildren() == 0 or not info.GameRunning.Value or (m.Value <= 0 and s.Value <= 0)
 
 		if info.GameRunning.Value and wave == waves then
+			EventCurrency.CompleteVictory(generation)
 			info.Message.Value = "VICTORY"
 			info.GameRunning.Value = false
 

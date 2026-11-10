@@ -2,6 +2,10 @@
 return {
  Enabled=true,
  CurrencyKey='EventCurrency',
+ QuotasEnabled=true,
+ ModeQuotas={Easy=145,Normal=315,Hard=650},
+ CompleteQuotaOnVictory=true, -- credit the remaining amount on a successful run
+
  DropChance=0.10,
  MinAmount=1,
  MaxAmount=5,
@@ -16,9 +20,17 @@ return {
  MaxBounces=3,
  BounceHeight=0.8,
  GroundOffset=0.1,
+ MinFloorNormalY=0.75,
+ MaxFloorRise=1.5,
+ FloorSearchDepth=32,
+ LandingAttempts=3,
+ LandingChecksPerFrame=24,
+ LandingClearanceRadius=0.35,
+ LandingClearanceHeight=1.5,
  CollectionDuration=0.4,
  CollectionOrbs=1,
  PickupDisplaySeconds=5,
+ PickupSoundMinInterval=0.08,
  -- Hard limits keep very large waves bounded. Excess drops/visuals are skipped.
  MaxActiveDrops=128,
  PickupHz=10,

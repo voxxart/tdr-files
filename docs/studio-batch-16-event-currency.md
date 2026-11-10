@@ -132,3 +132,5 @@ print(require(game.ServerScriptService.EventCurrencySystem.Service).GetDiagnosti
 All 184 game Luau files compile. Twenty-two Luau tests and fifteen Python fixtures pass. New fixtures execute the actual drop service, wallet, datastore load/disconnect path, client effects, pool, and asset resolver against mocked engine boundaries. They cover personal copies, one credit per player, range/landing checks, caps, pause/expiry, cancellation, zero per-pickup writes, disconnect persistence without duplicate rewards, snapshot races, arc/collection motion, Highlights, pooled reuse, Model/BasePart assets, and cleanup.
 
 Roblox rendering, real map raycasts, replication, DataStore networking, and your model's visual/performance behavior still need the Studio and published-server checks above. These fixtures do not establish a zero-lag guarantee.
+
+See [batch 18](studio-batch-18-currency-quotas.md) for per-mode personal quotas, the balance HUD, and floor landing updates.
