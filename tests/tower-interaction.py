@@ -27,7 +27,7 @@ end
 local world=node('Workspace')
 world.Towers=node('Folder',world); world.Mobs=node('Folder',world); world.Units=node('Folder',world)
 local origin,direction=vector(0),vector(1)
-world.CurrentCamera={ScreenPointToRay=function(_,x,y) assert(x==100 and y==50); return {Origin=origin,Direction=direction} end}
+world.CurrentCamera={ScreenPointToRay=function() error('raw mouse coordinates must not use GUI-inset projection') end,ViewportPointToRay=function(_,x,y) assert(x==100 and y==50); return {Origin=origin,Direction=direction} end}
 local gui=node('PlayerGui'); local guiObjects={}
 function gui:GetGuiObjectsAtPosition() return guiObjects end
 local hits={}; local assistHit; local enemyHit; local radiusUsed; local rayCalls=0; local sphereCalls=0
@@ -127,8 +127,9 @@ v=function(x,y,z)
  {__mul=function(a,n) return v(a.X*n,a.Y*n,a.Z*n) end,__sub=function(a,b) return v(a.X-b.X,a.Y-b.Y,a.Z-b.Z) end})
 end
 local scenario,depth='near',20
+local bodyPart=enemyPart
 local sampleCalls=0
-world.CurrentCamera={ScreenPointToRay=function(_,x,y)
+world.CurrentCamera={ScreenPointToRay=function() error('raw mouse coordinates must not use GUI-inset projection') end,ViewportPointToRay=function(_,x,y)
  local dx,dy=(x-100)/500,(y-50)/500; local length=math.sqrt(dx*dx+dy*dy+1)
  return {Origin=v(0,0,0),Direction=v(dx/length,dy/length,1/length)}
 end}
@@ -136,6 +137,7 @@ function world:Raycast(o,d,params)
  sampleCalls+=1
  local sx,sy=d.X/d.Z*500,d.Y/d.Z*500
  local isCenter=math.abs(sx)<0.01 and math.abs(sy)<0.01
+ if scenario=='body' and math.abs(sx)<=10 and math.abs(sy)<=12 then return {Instance=bodyPart,Distance=depth,Position=v(sx/500*depth,sy/500*depth,depth)} end
  if scenario=='direct' and isCenter then return {Instance=enemyPart,Distance=depth,Position=v(0,0,depth)} end
  if isCenter then
   if scenario=='wall' then return {Instance=wall.Instance,Distance=5,Position=v(0,0,5)} end
@@ -150,7 +152,21 @@ function world:Raycast(o,d,params)
  return nil
 end
 tower.Parent=world.Towers; tower.Config.Health.HealthValue.Value=100
-picker.PixelTolerance=6
+assert(Interaction.PixelTolerance==0,'cursor alignment must not rely on tolerance')
+-- The visible model spans a small rectangle at 128 studs. Test its whole body,
+-- with a nonzero GUI inset modeled separately from the raw viewport pointer.
+picker.PixelTolerance=0; scenario='body'; depth=128
+for _,inset in {36,58} do
+ world.CurrentCamera.ScreenPointToRay=function(_,x,y) return world.CurrentCamera:ViewportPointToRay(x,y+inset) end
+ for _,subject in {{enemyPart,enemy},{part,tower},{unitHit.Instance,unit}} do
+ bodyPart=subject[1]
+ for _,x in {91,100,109} do for _,y in {39,50,61} do
+  sampleCalls=0
+  assert(select(2,picker:Pick({X=x,Y=y}))==subject[2] and sampleCalls==1,'visible body at 128 studs must hit without inset drift or padding')
+ end end
+ end
+end
+scenario='near'; picker.PixelTolerance=6
 for _,z in {20,100} do
  depth=z; sampleCalls=0
  assert(select(2,picker:Pick({X=100,Y=50}))==tower,'same pixel tolerance must work at near and far zoom')
@@ -166,7 +182,7 @@ picker.MaxQueriesPerPick=3; sampleCalls=0; picker:Pick({X=100,Y=50}); assert(sam
 picker:Destroy(); assert(picker.Container.Destroyed)
 for _,folder in {world.Mobs,world.Towers,world.Units} do for _,c in folder.DescendantAdded.Connections do assert(not c.Connected) end end
 assert(sphereCalls==0,'no entity type should use sphere assistance')
-print('Tower interaction checks passed: nested models, screen pointer, exact priority and zoom-independent pixel tolerance, world cap and query budget, invisible-helper filtering, query group, occlusion, UI blocking, outline priority, death/removal, cleanup')
+print('Tower interaction checks passed: nested models, screen pointer, raw viewport cursor alignment at 128 studs with GUI insets, exact priority and optional pixel tolerance, world cap and query budget, invisible-helper filtering, query group, occlusion, UI blocking, outline priority, death/removal, cleanup')
 '''
 with tempfile.NamedTemporaryFile('w',suffix='.luau') as f:
  f.write(code); f.flush()

@@ -3,7 +3,7 @@ local Players = game:GetService('Players')
 local Rep = game:GetService('ReplicatedStorage')
 local Interaction = {}
 Interaction.MaxSkippedParts = 32
-Interaction.PixelTolerance = 6 -- screen pixels; 0 restores exact-only picking
+Interaction.PixelTolerance = 0 -- optional screen-pixel fallback; correct cursor coordinates need no padding
 Interaction.MaxWorldTolerance = 1.25 -- studs; prevents distant samples reaching too far
 Interaction.MaxQueriesPerPick = 48
 local diagonal=math.sqrt(0.5)
@@ -102,8 +102,10 @@ end
 function Interaction:Pick(position,ignore)
 	local camera=self.World.CurrentCamera
 	if not camera or self:IsBlocked(position) then return nil,nil,nil end
-	-- GetMouseLocation/InputObject.Position use screen coordinates, including inset.
-	local ray=camera:ScreenPointToRay(position.X,position.Y)
+	-- GetMouseLocation/InputObject.Position are raw window coordinates.
+ -- ViewportPointToRay consumes these directly. ScreenPointToRay expects
+ -- GUI-inset-relative coordinates and would shift the ray below the cursor.
+	local ray=camera:ViewportPointToRay(position.X,position.Y)
 	local excluded={camera,self.Container}
 	if ignore then table.insert(excluded,ignore) end
 	local dependencies=self.World:FindFirstChild('GameDependencies')
@@ -141,7 +143,7 @@ function Interaction:Pick(position,ignore)
   local best,bestModel,bestKind
   for _,offset in sampleDirections do
    if used>=self.MaxQueriesPerPick then break end
-   local sample=camera:ScreenPointToRay(position.X+offset[1]*radius,position.Y+offset[2]*radius)
+   local sample=camera:ViewportPointToRay(position.X+offset[1]*radius,position.Y+offset[2]*radius)
    local hit,target,targetKind=cast(sample)
    if target and hit.Distance<=ceiling then
     local delta=hit.Position-ray.Origin

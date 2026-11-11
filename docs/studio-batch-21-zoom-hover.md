@@ -1,5 +1,7 @@
 # Batch 21: easier hover and tower clicks when zoomed out
 
+**Superseded default:** [batch 22](studio-batch-22-cursor-alignment.md) corrects the pointer projection and disables tolerance by default.
+
 ## Replace
 
 - [ ] **ModuleScript** `ReplicatedStorage.GameModules.TowerInteraction`
