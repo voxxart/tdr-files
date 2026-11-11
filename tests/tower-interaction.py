@@ -51,6 +51,7 @@ local environment=setmetatable({game={GetService=function(_,key) if key=='Replic
 local chunk=assert(loadstring(source)); setfenv(chunk,environment)
 local Interaction=chunk()
 local picker=Interaction.new(world,gui)
+picker.PixelTolerance=0 -- retain the exact-only regression scenarios below
 local tower=node('Model',world.Towers); tower.Config=node('Folder',tower); tower.Config.Health=node('Folder',tower.Config); tower.Config.Health.HealthValue={Value=100}
 local nested=node('Model',tower); local part=node('Part',nested)
 local hit={Instance=part,Distance=20,Position=vector(20)}
@@ -119,10 +120,53 @@ tower.Attributes.Dead=false; tower.Config.Health.HealthValue.Value=0
 assert(picker:Resolve(part)==nil)
 tower.Config.Health.HealthValue.Value=100; tower.Parent=nil
 assert(picker:Resolve(part)==nil)
+-- Use a perspective camera and engine-like rays for zoom-independent tolerance.
+local v
+v=function(x,y,z)
+ return setmetatable({X=x,Y=y,Z=z,Magnitude=math.sqrt(x*x+y*y+z*z),Dot=function(a,b) return a.X*b.X+a.Y*b.Y+a.Z*b.Z end},
+ {__mul=function(a,n) return v(a.X*n,a.Y*n,a.Z*n) end,__sub=function(a,b) return v(a.X-b.X,a.Y-b.Y,a.Z-b.Z) end})
+end
+local scenario,depth='near',20
+local sampleCalls=0
+world.CurrentCamera={ScreenPointToRay=function(_,x,y)
+ local dx,dy=(x-100)/500,(y-50)/500; local length=math.sqrt(dx*dx+dy*dy+1)
+ return {Origin=v(0,0,0),Direction=v(dx/length,dy/length,1/length)}
+end}
+function world:Raycast(o,d,params)
+ sampleCalls+=1
+ local sx,sy=d.X/d.Z*500,d.Y/d.Z*500
+ local isCenter=math.abs(sx)<0.01 and math.abs(sy)<0.01
+ if scenario=='direct' and isCenter then return {Instance=enemyPart,Distance=depth,Position=v(0,0,depth)} end
+ if isCenter then
+  if scenario=='wall' then return {Instance=wall.Instance,Distance=5,Position=v(0,0,5)} end
+  return nil
+ end
+ if sx>(if scenario=='outside' then 7.9 else 2.9) and math.abs(sy)<0.1 then
+  local distance=depth*math.sqrt(1+(sx/500)^2)
+  return {Instance=part,Distance=distance,Position=v(sx/500*depth,0,depth)}
+ end
+ if scenario=='crowded' and sy>2.9 and math.abs(sx)<0.1 then return {Instance=unitHit.Instance,Distance=10,Position=v(0,sy/500*10,10)} end
+ if scenario=='outer' and sy>5.9 and math.abs(sx)<0.1 then return {Instance=unitHit.Instance,Distance=10,Position=v(0,sy/500*10,10)} end
+ return nil
+end
+tower.Parent=world.Towers; tower.Config.Health.HealthValue.Value=100
+picker.PixelTolerance=6
+for _,z in {20,100} do
+ depth=z; sampleCalls=0
+ assert(select(2,picker:Pick({X=100,Y=50}))==tower,'same pixel tolerance must work at near and far zoom')
+ assert(sampleCalls<=17)
+end
+scenario='direct'; sampleCalls=0; assert(select(2,picker:Pick({X=100,Y=50}))==enemy and sampleCalls==1,'direct cursor hit wins without fallback')
+scenario='wall'; assert(select(2,picker:Pick({X=100,Y=50}))==nil,'samples behind the center wall must be rejected')
+scenario='outer'; depth=100; assert(select(2,picker:Pick({X=100,Y=50}))==tower,'inner ring must beat a nearer-depth model farther away in pixels')
+scenario='crowded'; assert(select(2,picker:Pick({X=100,Y=50}))==unit,'same-ring candidates must prefer the frontmost body')
+scenario='outside'; assert(select(2,picker:Pick({X=100,Y=50}))==nil,'models outside the pixel footprint must not be selected')
+scenario='near'; depth=1000; assert(select(2,picker:Pick({X=100,Y=50}))==nil,'world-space cap prevents excessive reach at extreme zoom')
+picker.MaxQueriesPerPick=3; sampleCalls=0; picker:Pick({X=100,Y=50}); assert(sampleCalls<=3,'global query budget applies to all samples')
 picker:Destroy(); assert(picker.Container.Destroyed)
 for _,folder in {world.Mobs,world.Towers,world.Units} do for _,c in folder.DescendantAdded.Connections do assert(not c.Connected) end end
 assert(sphereCalls==0,'no entity type should use sphere assistance')
-print('Tower interaction checks passed: nested models, screen pointer, exact bodies without radius assist, invisible-helper filtering, query group, occlusion, UI blocking, outline priority, death/removal, cleanup')
+print('Tower interaction checks passed: nested models, screen pointer, exact priority and zoom-independent pixel tolerance, world cap and query budget, invisible-helper filtering, query group, occlusion, UI blocking, outline priority, death/removal, cleanup')
 '''
 with tempfile.NamedTemporaryFile('w',suffix='.luau') as f:
  f.write(code); f.flush()

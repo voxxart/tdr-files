@@ -3,6 +3,11 @@ local Players = game:GetService('Players')
 local Rep = game:GetService('ReplicatedStorage')
 local Interaction = {}
 Interaction.MaxSkippedParts = 32
+Interaction.PixelTolerance = 6 -- screen pixels; 0 restores exact-only picking
+Interaction.MaxWorldTolerance = 1.25 -- studs; prevents distant samples reaching too far
+Interaction.MaxQueriesPerPick = 48
+local diagonal=math.sqrt(0.5)
+local sampleDirections={{1,0},{-1,0},{0,1},{0,-1},{diagonal,diagonal},{-diagonal,diagonal},{diagonal,-diagonal},{-diagonal,-diagonal}}
 local helperNames = {Border=true,Hitbox=true,EnemyProxyRoot=true}
 local function visiblePart(part,model)
  if part.Transparency>=1 or part.LocalTransparencyModifier>=1 then return false end
@@ -109,20 +114,47 @@ function Interaction:Pick(position,ignore)
 	end
  local params=self.Params
  params.CollisionGroup=Rep:GetAttribute('InteractionQueryGroup') or 'Default'
- -- Each ray starts at the exact cursor. No nearest-model or radius assistance.
- -- Recasting removes only invisible helpers, effects, and retired models.
- for _=1,self.MaxSkippedParts do
-  params.FilterDescendantsInstances=excluded
-  local hit=self.World:Raycast(ray.Origin,ray.Direction*1000,params)
-  if not hit then return nil,nil,nil end
-  local owner=self:Owner(hit.Instance)
-  local model,kind=self:Resolve(owner)
-  if owner and not model then table.insert(excluded,owner)
-  elseif not visiblePart(hit.Instance,owner) then table.insert(excluded,hit.Instance)
-  elseif model then return hit,model,kind
-  else return hit,nil,nil end -- Solid map geometry occludes everything behind it.
+ local used=0
+ local function cast(sampleRay)
+  local ignored=table.clone(excluded)
+  for _=1,self.MaxSkippedParts do
+   if used>=self.MaxQueriesPerPick then return nil,nil,nil end
+   used+=1; params.FilterDescendantsInstances=ignored
+   local hit=self.World:Raycast(sampleRay.Origin,sampleRay.Direction*1000,params)
+   if not hit then return nil,nil,nil end
+   local owner=self:Owner(hit.Instance)
+   local model,kind=self:Resolve(owner)
+   if owner and not model then table.insert(ignored,owner)
+   elseif not visiblePart(hit.Instance,owner) then table.insert(ignored,hit.Instance)
+   else return hit,model,kind end
+  end
+  return nil,nil,nil
  end
- return nil,nil,nil
+ local exact,model,kind=cast(ray)
+ if model then return exact,model,kind end
+ local pixels=math.clamp(self.PixelTolerance,0,12)
+ if pixels==0 then return exact,nil,nil end
+ -- Search a small screen footprint, never an enlarged actor/world hitbox.
+ -- Closer pixel rings win; within a ring, choose the frontmost visible body.
+ local ceiling=if exact then exact.Distance+0.05 else 1000
+ for _,radius in {pixels*0.5,pixels} do
+  local best,bestModel,bestKind
+  for _,offset in sampleDirections do
+   if used>=self.MaxQueriesPerPick then break end
+   local sample=camera:ScreenPointToRay(position.X+offset[1]*radius,position.Y+offset[2]*radius)
+   local hit,target,targetKind=cast(sample)
+   if target and hit.Distance<=ceiling then
+    local delta=hit.Position-ray.Origin
+    local along=delta:Dot(ray.Direction)
+    local lateral=delta-ray.Direction*along
+    if along>0 and lateral.Magnitude<=self.MaxWorldTolerance and (not best or hit.Distance<best.Distance) then
+     best,bestModel,bestKind=hit,target,targetKind
+    end
+   end
+  end
+  if best then return best,bestModel,bestKind end
+ end
+ return exact,nil,nil
 end
 
 function Interaction:Update(hovered,selected)
