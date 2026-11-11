@@ -16,6 +16,7 @@ modules = {name: (root / path).read_text() for name, path in {
     'damage': 'Tower Defense R/ServerScriptService/TowerSystem/DirectDamage.luau',
     'primary': 'Tower Defense R/ServerScriptService/TowerSystem/PrimaryAttack.luau',
     'projectiles': 'Tower Defense R/ServerScriptService/TowerSystem/ProjectileService.luau',
+    'prediction': 'Tower Defense R/ServerScriptService/TowerSystem/ProjectilePrediction.luau',
     'profiles': 'Tower Defense R/ReplicatedStorage/GameModules/CombatProfiles.luau',
     'secondary': 'Tower Defense R/ServerScriptService/TowerSystem/SecondaryAttack.luau',
     'burst': 'Tower Defense R/ServerScriptService/TowerSystem/BurstAttack.luau',
@@ -43,13 +44,13 @@ local Match = {
 }
 local runtime = {State={},Cleanup={Add=function(_,fn) table.insert(cleanup,fn) end}}
 local Runtime = {Get=function() return runtime end}
-local dependency = {match=Match, runtime=Runtime}
+local dependency = {match=Match, runtime=Runtime,enemyPaths={}}
 local workspace = {Info={GameSpeed={Value=1}}}
 local environment = setmetatable({
-    game={ServerScriptService={Simulation={MatchService='match'},EnemySystem={EnemyRuntime='runtime'}},
+    game={ServerScriptService={Simulation={MatchService='match'},EnemySystem={EnemyRuntime='runtime',EnemyPaths='enemyPaths'}},
         ReplicatedStorage={GameModules={CombatProfiles='profiles'}}},
     workspace=workspace,
-    script={Parent={DirectDamage='damage',TowerRuntime='runtime'}},
+    script={Parent={DirectDamage='damage',TowerRuntime='runtime',ProjectilePrediction='prediction'}},
     task={spawn=function(fn) table.insert(queued,fn) end,wait=function() end},
     require=function(id) assert(dependency[id], id); return dependency[id] end,
 }, {__index=getfenv()})
@@ -134,6 +135,7 @@ valid=false
 queued[1](); table.clear(queued)
 assert(attacks==before+3 and not data.isBursting, 'Cancelled burst must release busy state without shots')
 valid=true
+dependency.prediction=load('prediction')
 local projectiles=load('projectiles')
 local emitted,impacts=0,0
 local function launch()

@@ -1,5 +1,6 @@
 local Match = require(game.ServerScriptService.Simulation.MatchService)
 local Runtime = require(script.Parent.TowerRuntime)
+local Prediction = require(script.Parent.ProjectilePrediction)
 local Projectiles = {}
 function Projectiles.Cancel(model)
 	local runtime = Runtime.Get(model)
@@ -20,7 +21,17 @@ function Projectiles.Launch(model, target, config, emit, impact)
 	local minimum = authored and authored:FindFirstChild('MinTravelTime')
 	local authoredSpeed = authored and authored:FindFirstChild('Speed')
 	local studs = math.max((authoredSpeed and authoredSpeed.Value) or (speed and speed.Value) or 50, 0.001)
-	local duration = math.max((aim-origin).Magnitude / studs, (minimum and minimum.Value) or 0.05)
+	local minTime = math.max((minimum and minimum.Value) or 0.05,0.05)
+ local duration = math.max((aim-origin).Magnitude / studs,minTime)
+ -- Mortars opt in by default; other splash towers keep their existing aim.
+ local predictive = config:GetAttribute('PredictProjectileTarget')
+ if predictive==nil then predictive=config:FindFirstChild('CliffTower')~=nil end
+ if predictive and Prediction.Enabled then
+  local weapon=model:FindFirstChild('Weapon'); local handle=weapon and weapon:FindFirstChild('Handle')
+  local barrel=handle and handle:FindFirstChild('Barrel')
+  origin=if barrel and barrel:IsA('Attachment') then barrel.WorldPosition elseif handle then handle.Position else origin
+  aim,duration=Prediction.Solve(target,origin,aim,studs,minTime,Match.Now())
+ end
 	runtime.State.Projectiles = runtime.State.Projectiles or {}
 	local pending = runtime.State.Projectiles
 	if not runtime.State.ProjectileCleanup then
