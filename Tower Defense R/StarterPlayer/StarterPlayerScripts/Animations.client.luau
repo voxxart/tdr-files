@@ -1687,47 +1687,37 @@ end
 
 
 
+local mortarFlights=require(ReplicatedStorage.GameModules:WaitForChild("MortarFlights")).new(workspace,VisualFolder)
 local function MortarfireProjectile(tower, aimPos, travelTime)
-	if not (tower and tower.Parent) then return end
-	if not tower.Config:FindFirstChild("Splash") then return end
-
-	local fragTemplate = TEMPLATE.Rocket
-	if not fragTemplate then return end
-
-	local weapon = tower:FindFirstChild("Weapon")
-	local handle = weapon and weapon:FindFirstChild("Handle")
-	if not handle then return end
-
-	local rocket = fragTemplate:Clone()
-	rocket.Parent = VisualFolder
-	rocket.Position = handle.Position
-
-	local aimPart = Instance.new("Part")
-	aimPart.Name = "AimPart"
-	aimPart.Size = Vector3.one
-	aimPart.Transparency = 1
-	aimPart.CanCollide = false
-	aimPart.Anchored = true
-	aimPart.Position = aimPos
-	aimPart.Parent = VisualFolder
-
-	local spin = math.rad(Random.new():NextNumber(-360, 360))
-
-	-- If the Rocket model's tip points backwards relative to LookVector,
-	-- change this offset, e.g. CFrame.Angles(0, math.pi, 0) to flip 180°,
-	-- or CFrame.Angles(-math.pi/2, 0, 0) if the tip points along the Top face.
-	local frontOffset = CFrame.new()
-
-	arcProjectileOriented(rocket, rocket.Position, aimPos, travelTime, 6, spin, frontOffset)
-
-	task.delay(travelTime, function()
-		if rocket and rocket.Parent then rocket:Destroy() end
-		if aimPart and aimPart.Parent then
-			Explode(aimPart, tower.Config.SplashRadius.Value)
-			aimPart:Destroy()
-		end
-	end)
+ if not (tower and tower.Parent and typeof(aimPos)=="Vector3") then return end
+ local config=tower:FindFirstChild("Config")
+ if not config or not config:FindFirstChild("Splash") or not TEMPLATE.Rocket then return end
+ local weapon=tower:FindFirstChild("Weapon")
+ local handle=weapon and weapon:FindFirstChild("Handle")
+ if not handle then return end
+ local barrel=handle:FindFirstChild("Barrel")
+ local muzzle=if barrel and barrel:IsA("Attachment") then barrel.WorldCFrame else handle.CFrame
+ local projectile=config:FindFirstChild("Projectile")
+ local heightValue=projectile and projectile:FindFirstChild("ArcHeight")
+ local height=heightValue and heightValue.Value or TEMPLATE.Rocket:GetAttribute("ArcHeight")
+ local offset=TEMPLATE.Rocket:GetAttribute("FrontOffset")
+ if typeof(offset)~="CFrame" then offset=CFrame.new() end
+ local radius=config.SplashRadius.Value
+ -- Server emits real-time duration at launch speed; convert back to game time.
+ local duration=math.max(travelTime or 0.5,0)*math.max(GameSpeedValue.Value,0.0001)
+ mortarFlights:Launch(TEMPLATE.Rocket,muzzle.Position,aimPos,duration,height,muzzle.LookVector,offset,function()
+  local anchor=Instance.new("Part"); anchor.Name="MortarImpact"; anchor.Transparency=1
+  anchor.Anchored=true; anchor.CanCollide=false; anchor.CanTouch=false; anchor.CanQuery=false
+  anchor.Position=aimPos; anchor.Parent=VisualFolder
+  Explode(anchor,radius); anchor:Destroy()
+ end)
 end
+local mortarConnection=RunService.RenderStepped:Connect(function(dt)
+ local message=Info.Message.Value
+ if not Info.GameRunning.Value or message=="VICTORY" or message=="GAME OVER" then mortarFlights:Clear(); return end
+ mortarFlights:Step(dt*math.max(GameSpeedValue.Value,0))
+end)
+script.Destroying:Connect(function() mortarConnection:Disconnect(); mortarFlights:Clear() end)
 
 
 --------------------------------------------------------------------
@@ -2534,7 +2524,7 @@ local function createAnimationState(object)
 		return nil
 	end
 
-	local controller = object:FindFirstChild("AnimationController")
+	local controller = object:FindFirstChild("AnimationController") or object:FindFirstChildOfClass("Humanoid")
 	local animationsFolder = object:FindFirstChild("Animations")
 
 	if not controller or not animationsFolder then
@@ -2773,6 +2763,10 @@ function setAnimation(object, animName)
 	end
 
 	track.Name = animName
+ if object.Parent==workspace:FindFirstChild("Towers") then
+  if animName=="Idle" then track.Looped=true; track.Priority=Enum.AnimationPriority.Idle
+  elseif track.Priority==Enum.AnimationPriority.Core then track.Priority=Enum.AnimationPriority.Action end
+ end
 	state.Tracks[key] = track
 	state.TrackSources[key] = animationObject
 	state.TrackIds[key] = animationObject.AnimationId
@@ -3122,8 +3116,21 @@ MobsFolder.ChildAdded:Connect(animateMobOnSpawn)
 UnitsFolder.ChildAdded:Connect(function(object)
 	playSpawnAnimation(object, "Walk")
 end)
-TowersFolder.ChildAdded:Connect(function(object)
-	playSpawnAnimation(object, "Idle")
+local towerIdleRecovery=require(ReplicatedStorage.GameModules:WaitForChild("TowerIdleRecovery")).new(function(object)
+ if object.Parent~=TowersFolder or object:GetAttribute("Dead")==true then return end
+ if ActiveReaperTowerCasts[object] or object:GetAttribute("ReaperSummoning")==true then return end
+ local track=setAnimation(object,"Idle")
+ if track and not track.IsPlaying then playLoadedTrack(object,"Idle",track) end
+end,16)
+local towerAdded=TowersFolder.ChildAdded:Connect(function(object)
+ towerIdleRecovery:Add(object); playSpawnAnimation(object,"Idle")
+end)
+local towerRemoved=TowersFolder.ChildRemoved:Connect(function(object)
+ towerIdleRecovery:Remove(object); cleanupAnimationState(object)
+end)
+local idleRecoveryConnection=RunService.RenderStepped:Connect(function(dt) towerIdleRecovery:Step(dt) end)
+script.Destroying:Connect(function()
+ towerAdded:Disconnect(); towerRemoved:Disconnect(); idleRecoveryConnection:Disconnect(); towerIdleRecovery:Clear()
 end)
 
 -- Existing models must also start playing (e.g. LocalScript started late).
@@ -3134,6 +3141,7 @@ for _, object in ipairs(UnitsFolder:GetChildren()) do
 	playSpawnAnimation(object, "Walk")
 end
 for _, object in ipairs(TowersFolder:GetChildren()) do
+ towerIdleRecovery:Add(object)
 	playSpawnAnimation(object, "Idle")
 end
 
