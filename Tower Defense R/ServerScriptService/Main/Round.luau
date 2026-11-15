@@ -284,9 +284,10 @@ function round.StartGame()
 			
 
 			local instant = workspace.Info:FindFirstChild("ForceNextWaveInstant")
-			if skipped or (instant and instant.Value == true) then
-    if instant then instant.Value=false end
+			if not skipped and instant and instant.Value == true then
+    instant.Value=false
 			else
+    if instant then instant.Value=false end
 				for i = 5, 1, -1 do
 					if i < 10 then
 						info.Timer.Value = "00:0" .. i
@@ -297,7 +298,9 @@ function round.StartGame()
 					info.Message.Value = ""
 					-- (you should play countdown sound via remote, but leaving your logic as-is)
 					game.StarterGui.GameGui.Sounds.Countdown:Play()
-					mob.ArrowSpawn("Arrow", 4, 0.05, 1, 1, map)
+     task.spawn(function()
+      if Match.IsCurrent(generation) then mob.ArrowSpawn("Arrow",4,0.05,1,1,map) end
+     end)
 				end
 			end
 		else

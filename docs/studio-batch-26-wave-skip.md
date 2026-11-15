@@ -19,7 +19,7 @@ No new events, functions, UI assets, EnemyService changes, or Mob wrapper change
 
 ## Behavior
 
-A passed skip advances to the next wave without waiting for the current wave's spawn sequence. Remaining enemy groups continue spawning alongside the next wave, using the existing shared EnemyService spawn budget. Already-spawned enemies remain. The ordinary wave reward is granted once, and a successful skip bypasses the reward-message delay and intermission countdown.
+A passed skip advances to the next wave without waiting for the current wave's spawn sequence. Remaining enemy groups continue spawning alongside the next wave, using the existing shared EnemyService spawn budget. Already-spawned enemies remain. The ordinary wave reward is granted once, and a successful skip bypasses the separate reward-message delay. Batch 28 restores the five-second intermission countdown after a skip.
 
 Round no longer blocks inside GetEasy/GetNormal/GetHard: it launches one scoped spawn job per wave and monitors progression independently. Pending jobs are tracked across overlapping waves. Clearing the map between groups does not finish a wave while spawns are pending. Old jobs stop on match end, and guarded group calls cannot start spawning into a later match generation.
 

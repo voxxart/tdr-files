@@ -93,13 +93,21 @@ assert(Waves.Pending==1 and not counts.Wave1)
 assert(Waves.Vote(roster[1],1) and not Waves.State.Skipped)
 assert(not Waves.Vote(roster[1],1) and not Waves.Vote(roster[2],0))
 assert(Waves.Vote(roster[2],1) and Waves.State.Skipped)
-untilTrue(function() return info.Wave.Value==2 end,10)
-assert(now-started[1]<0.2 and Waves.Pending==2 and not counts.Wave1,'next wave must start immediately while the previous wave has not spawned its enemies')
+local skippedAt=now
+untilTrue(function() return not Waves.State.Active end,10)
+assert(info.Wave.Value==1 and info.Timer.Value=='00:05','skip must enter the intermission before starting the next wave')
+for _,p in roster do assert(p.Cash.Value==70,'skip reward must be awarded before countdown') end
+local pausedAtCountdown=now; info.GameSpeed.Value=0
+for _=1,20 do tick(0.05) end
+assert(now==pausedAtCountdown and info.Wave.Value==1,'skip countdown must freeze while paused')
+info.GameSpeed.Value=1
+untilTrue(function() return info.Wave.Value==2 end,150)
+assert(now-skippedAt>=5 and now-skippedAt<5.4 and Waves.Pending==2 and counts.Wave1==1,'next wave starts after five game seconds while previous enemies keep spawning')
 assert(info.VoteSkipValue.Value==0 and not Waves.Vote(roster[1],1) and not Waves.Vote(roster[1],2),'final-wave and stale votes must be rejected')
 for _,p in roster do assert(p.Cash.Value==70,'skipped wave reward is granted once') end
-local pausedAt=now; info.GameSpeed.Value=0
+local pausedAt=now; local spawnedBeforePause=counts.Wave1; info.GameSpeed.Value=0
 for _=1,20 do tick(0.05) end
-assert(now==pausedAt and not counts.Wave1 and completed==0,'pause must freeze both overlapping spawn jobs')
+assert(now==pausedAt and counts.Wave1==spawnedBeforePause and completed==0,'pause must freeze both overlapping spawn jobs')
 info.GameSpeed.Value=1
 untilTrue(function() return now>=started[2]+7 end)
 assert(info.Min.Value==0 and info.Sec.Value==0 and completed==0,'final timer expiry and empty map must not beat queued spawns')
@@ -117,7 +125,7 @@ assert(info.Min.Value==1 and info.Sec.Value==0 and info.SkipTime.Value==45 and n
 now+=15; Waves.Step(); assert(Waves.State.Open,'authored skip time must be owned by the wave controller')
 Waves.Spawn(generation,function() error('fixture spawn failure') end); tick(0.05)
 assert(Waves.Failed==generation and info.GameRunning.Value and not Waves.CanAdvance(),'a spawn fault must not instantly defeat the match or silently clear the wave')
-print('Wave overlap passed: actual round starts next wave mid-spawn, preserves all groups, per-wave votes, reward once, pause, final-wave completion and old-generation isolation')
+print('Wave overlap passed: actual round waits five game seconds after skip and starts next wave mid-spawn, preserves all groups, per-wave votes, reward once, pause, final-wave completion and old-generation isolation')
 '''
 with tempfile.NamedTemporaryFile('w',suffix='.luau') as f:
  f.write(code); f.flush(); subprocess.run(['/workspace/tools/luau-0.745/luau',f.name],check=True,cwd=root)
