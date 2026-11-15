@@ -5669,52 +5669,48 @@ local function LoadGui()
 	local messageFrame = gui.Info.Messages
 	local messageText = messageFrame.ActualMessage.Message
 
-	local tweenTime = 0.4
-	local introTweenInfo = TweenInfo.new(tweenTime, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
-	local outroTweenInfo = TweenInfo.new(tweenTime, Enum.EasingStyle.Sine, Enum.EasingDirection.In)
-
-	local originalPosition = messageFrame.Position
-	local hiddenPosition = originalPosition - UDim2.new(0, 0, 1.3, 0)
-
-	messageFrame.Position = hiddenPosition
-	messageFrame.Visible = false
-
-	local function playIntro()
-		messageFrame.Visible = true
-		local tween = TweenService:Create(messageFrame, introTweenInfo, { Position = originalPosition })
-		tween:Play()
-	end
-
-	local function playOutro(callback)
-		local tween = TweenService:Create(messageFrame, outroTweenInfo, { Position = hiddenPosition })
-		tween:Play()
-		tween.Completed:Connect(function()
-			messageFrame.Visible = false
-			if callback then callback() end
-		end)
-	end
-
-	messageText.Text = info.Message.Value
-
-	info.Message.Changed:Connect(function(change)
-		messageText.Text = change
-
-		if change == "" then
-			task.delay(2, function()
-				playOutro()
-			end)
-		else
-			playIntro()
-			task.delay(2, function()
-				playOutro()
-			end)
-
-			if change == "VICTORY" or change == "GAME OVER" and GameWrapUp == false then
-				DisplayEndScreen(change)
-			end
-		end
-	end)
-
+ local tweenTime=0.4
+ local originalPosition=messageFrame.Position
+ local hiddenPosition=originalPosition-UDim2.new(0,0,1.3,0)
+ local messageVersion=0
+ local activeTween
+ local alive=true
+ messageFrame.Position=hiddenPosition; messageFrame.Visible=false; messageText.Text=""
+ local function cancelTween()
+  if activeTween then activeTween:Cancel(); activeTween=nil end
+ end
+ local function showReward(change)
+  -- This banner is only for wave rewards; server phase/status text stays private to its UI.
+  if type(change)~="string" or not change:match("^Wave Reward:%s*%$") then return end
+  messageVersion+=1
+  local version=messageVersion
+  cancelTween()
+  messageText.Text=change; messageFrame.Visible=true
+  activeTween=TweenService:Create(messageFrame,TweenInfo.new(tweenTime,Enum.EasingStyle.Sine,Enum.EasingDirection.Out),{Position=originalPosition})
+  activeTween:Play()
+  -- Hold for five real seconds after the entrance finishes, independent of timescale
+  -- and the server clearing Info.Message during the intermission countdown.
+  task.delay(5+tweenTime,function()
+   if not alive or version~=messageVersion then return end
+   cancelTween()
+   activeTween=TweenService:Create(messageFrame,TweenInfo.new(tweenTime,Enum.EasingStyle.Sine,Enum.EasingDirection.In),{Position=hiddenPosition})
+   activeTween.Completed:Once(function(state)
+    if alive and version==messageVersion and state==Enum.PlaybackState.Completed then messageFrame.Visible=false end
+   end)
+   activeTween:Play()
+  end)
+ end
+ local function onMessage(change)
+  if change=="VICTORY" or change=="GAME OVER" then
+   messageVersion+=1; cancelTween(); messageFrame.Visible=false; messageText.Text=""
+   if not GameWrapUp then DisplayEndScreen(change) end
+  else showReward(change) end
+ end
+ local messageConnection=info.Message.Changed:Connect(onMessage)
+ script.Destroying:Connect(function()
+  alive=false; messageVersion+=1; cancelTween(); messageConnection:Disconnect()
+ end)
+ onMessage(info.Message.Value)
 
 
 	SetupVoteGui()
