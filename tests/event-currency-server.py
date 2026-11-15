@@ -50,7 +50,7 @@ local world=node('Workspace'); world.Info=node('Folder','Info'); world.Info.Game
 function world:Raycast(origin) return {Position=vec(origin.X,0,origin.Z),Normal=vec(0,1,0)} end
 function world:GetPartBoundsInBox() return {} end
 local match={Capture=function() return generation end,Now=function() return now end,IsCurrent=function(g) return running and g==generation end}
-local config={QuotasEnabled=false,Enabled=true,CurrencyKey='EventCurrency',DropChance=1,MinAmount=3,MaxAmount=3,Lifetime=10,PickupRadius=6,LaunchDuration=0.5,BounceDuration=0.2,ScatterMin=0,ScatterMax=0,GroundOffset=0,MaxActiveDrops=2,PickupHz=10}
+local config={QuotasEnabled=false,Enabled=true,CurrencyKey='EventCurrency',DropChance=1,MinAmount=3,MaxAmount=3,Lifetime=10,PickupRadius=6,LaunchDuration=0.5,BounceDuration=0.2,ScatterMin=0,ScatterMax=0,GroundOffset=0,MaxActiveDrops=2,PickupHz=20,PickupDelay=0.15,PickupMaxHeight=8}
 local profiles={[1]={Coins=100,EventCurrency=10},[2]={Coins=200}}
 local writes=0; local stored={}
 local db={GetAsync=function(_,id) return profiles[id] end,UpdateAsync=function(_,id,fn) writes+=1; stored[id]=fn() end}
@@ -73,13 +73,13 @@ local service=load('service')
 local map=node('Folder')
 assert(service.TryDrop(vec(0,3,0),map,3)); assert(service.TryDrop(vec(0,3,0),map,3)); assert(not service.TryDrop(vec(0,3,0),map,3))
 local function step(dt) now+=dt*world.Info.GameSpeed.Value; beat:Fire(dt) end
-step(0.1)
+step(0.05)
 local event=events.EventCurrency
 assert(#event.Broadcasts==1 and #event.Broadcasts[1]==2)
 local snap=events.EventCurrencySnapshot.OnServerInvoke(p1); assert(#snap==2)
 p1.Character.HumanoidRootPart.Position=vec(0,1,0)
-step(0.4); assert(profiles[1].EventCurrency==10,'cannot collect during initial arc/bounce')
-step(0.3); assert(profiles[1].EventCurrency==16 and profiles[2].EventCurrency==nil)
+step(0.05); assert(profiles[1].EventCurrency==10,'short pickup grace must be respected')
+step(0.06); assert(profiles[1].EventCurrency==16 and profiles[2].EventCurrency==nil)
 assert(service.GetDiagnostics().ActiveDrops==2,'personal collection must not remove another player copy')
 step(0.2); assert(profiles[1].EventCurrency==16,'same player cannot claim twice')
 p2.Character.HumanoidRootPart.Position=vec(0,1,0)
@@ -132,6 +132,19 @@ wallet.Publish(p2)
 assert(p2.Attributes.EventCurrencyKey=='Pumpkins' and p2.Attributes.EventCurrencyBalance==1234)
 assert(wallet.Credit(p2,7) and profiles[2].Pumpkins==1241 and p2.Attributes.EventCurrencyBalance==1241)
 assert(profiles[2].EventCurrency==35,'changing the currency key must not mutate the old bank')
+-- A generous horizontal radius must not shrink with HRP height or wait for bounces.
+config.CurrencyKey='EventCurrency'; config.QuotasEnabled=false; config.PickupRadius=10
+generation+=1; service.BeginMatch('Easy',generation)
+local before=profiles[2].EventCurrency
+p2.Character.HumanoidRootPart.Position=vec(9.9,3,0)
+assert(service.TryDrop(vec(0,3,0),map,3)); step(0.1); assert(profiles[2].EventCurrency==before)
+step(0.06); assert(profiles[2].EventCurrency==before+3,'pickup must begin near ten horizontal studs before bounce animation finishes')
+p2.Character.HumanoidRootPart.Position=vec(9.9,9,0)
+assert(service.TryDrop(vec(0,3,0),map,3)); step(0.2); assert(profiles[2].EventCurrency==before+3,'vertical separation still blocks collection from another floor')
+p2.Character.HumanoidRootPart.Position=vec(9.9,8,0); step(0.05); assert(profiles[2].EventCurrency==before+6)
+p2.Character.HumanoidRootPart.Position=vec(10.1,3,0)
+assert(service.TryDrop(vec(0,3,0),map,3)); step(0.2); assert(profiles[2].EventCurrency==before+6,'outside horizontal radius must not credit')
+p2.Character.HumanoidRootPart.Position=vec(10,3,0); step(0.05); assert(profiles[2].EventCurrency==before+9,'boundary entry must credit on the next 20 Hz check')
 print('Event currency server passed: personal claims, duplicate prevention, range/landing checks, caps, pause/expiry, cancellation, zero per-pickup saves, actual datastore load/disconnect persistence')
 '''
 with tempfile.NamedTemporaryFile('w',suffix='.luau') as f:

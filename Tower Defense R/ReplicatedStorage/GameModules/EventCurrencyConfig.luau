@@ -10,7 +10,9 @@ return {
  MinAmount=1,
  MaxAmount=5,
  Lifetime=30, -- game seconds, including the launch
- PickupRadius=6,
+ PickupRadius=10, -- horizontal studs; character height does not shrink the range
+ PickupMaxHeight=8, -- vertical separation limit
+ PickupDelay=0.15, -- game seconds; no need to wait for all bounces
  LaunchDuration=0.65,
  ArcHeight=5,
  ScatterMin=2,
@@ -21,7 +23,7 @@ return {
  BounceHeight=0.8,
  GroundOffset=0.1,
  LandingChecksPerFrame=24, -- at most one simple landing ray per attempted drop
- CollectionDuration=0.65,
+ CollectionDuration=0.45,
  CollectionOrbs=3,
  PickupDisplaySeconds=5, -- refreshed on each pickup
  PickupCountDuration=0.3,
@@ -32,7 +34,7 @@ return {
  PickupSoundMinInterval=0.08,
  -- Hard limits keep very large waves bounded. Excess drops/visuals are skipped.
  MaxActiveDrops=128,
- PickupHz=10,
+ PickupHz=20, -- real-time checks, independent of game speed
  MaxClientVisuals=160,
  ClientBuildsPerFrame=8,
 }

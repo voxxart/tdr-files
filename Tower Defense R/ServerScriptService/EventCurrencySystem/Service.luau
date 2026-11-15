@@ -98,7 +98,7 @@ function Service.TryDrop(origin,map,height)
  local now=Match.Now()
  local record=store:Add({From=origin,Land=land,Amount=amount,Amounts=amounts,Created=now,Lifetime=math.max(1,Config.Lifetime),Eligible=eligible,Claimed={},
   Bounces=random:NextInteger(math.clamp(Config.MinBounces or 2,1,6),math.clamp(math.max(Config.MinBounces or 2,Config.MaxBounces or 3),1,6)),
-  Ready=now+Config.LaunchDuration+Config.BounceDuration,Generation=Match.Capture()})
+  Ready=now+math.max(0,Config.PickupDelay or 0.15),Generation=Match.Capture()})
  if record then table.insert(pending,message(record)); return true end
  for id,value in amounts do quota:Release(id,value) end
  return false
@@ -137,8 +137,9 @@ local elapsed=0
 RunService.Heartbeat:Connect(function(dt)
  raysLeft=Config.LandingChecksPerFrame or 24
  elapsed+=dt
- if elapsed<1/math.max(1,Config.PickupHz) then return end
- elapsed=0
+ local interval=1/math.max(1,Config.PickupHz)
+ if elapsed<interval then return end
+ elapsed%=interval
  local now=Match.Now()
  if #store.Active>0 then
   local candidates={}
@@ -158,7 +159,7 @@ RunService.Heartbeat:Connect(function(dt)
      local player=candidate.Player; local id=player.UserId
      if record.Eligible[id] and not record.Claimed[id] then
       local delta=candidate.Position-record.Land
-      if delta:Dot(delta)<=Config.PickupRadius^2 then
+      if delta.X*delta.X+delta.Z*delta.Z<=Config.PickupRadius^2 and math.abs(delta.Y)<=(Config.PickupMaxHeight or 8) then
        local amount=quota:ClaimAmount(id,record.Amounts[id])
        if amount>0 and Wallet.Credit(player,amount) then
         record.Claimed[id]=true; quota:Collected(id,amount,record.Amounts[id]); collectMessage(player,record.Id,amount)
