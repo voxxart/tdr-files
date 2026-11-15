@@ -2759,26 +2759,24 @@ end)
 
 local TextChatService = game:GetService("TextChatService")
 
-skipButon.OnClientEvent:Connect(function(t, f)
-	if t then
-		gui.SkipFrame.Visible = true
-		gui.SkipFrame.UpgradeArea.ButtonArea.Skip.Visible = true
-		gui.SkipFrame.UpgradeArea.ButtonArea.Pass.Visible = true
-		if f then
-			gui.SkipFrame.Visible = false
-			gui.SkipFrame.UpgradeArea.ButtonArea.Skip.Visible = false
-			gui.SkipFrame.UpgradeArea.ButtonArea.Pass.Visible = false
-		end
-		if workspace.Info.PlrValue.Value > 1 then
-			gui.SkipFrame.Title.Text = "Skip Wave? (" .. workspace.Info.VoteSkipValue.Value .. "/" .. (workspace.Info.PlrValue.Value - 1) .. ")"
-		else
-			gui.SkipFrame.Title.Text = "Skip Wave? (" .. workspace.Info.VoteSkipValue.Value .. "/" .. workspace.Info.PlrValue.Value .. ")"
-		end
-	end
-end)
-events.SkipWaveHide.OnClientEvent:Connect(function()
-	gui.SkipFrame.Visible = false
-end)
+local skipChoiceWave
+local function updateSkipCard()
+ local wave=info.Wave.Value
+ local open=info:GetAttribute("SkipOpen")==true and info.GameRunning.Value and skipChoiceWave~=wave
+ gui.SkipFrame.Visible=open
+ gui.SkipFrame.UpgradeArea.ButtonArea.Skip.Visible=open
+ gui.SkipFrame.UpgradeArea.ButtonArea.Pass.Visible=open
+ local required=info:GetAttribute("SkipRequired") or math.max(1,workspace.Info.PlrValue.Value-1)
+ gui.SkipFrame.Title.Text="Skip Wave? ("..info.VoteSkipValue.Value.."/"..required..")"
+end
+skipButon.OnClientEvent:Connect(updateSkipCard)
+events.SkipWaveHide.OnClientEvent:Connect(updateSkipCard)
+info:GetAttributeChangedSignal("SkipOpen"):Connect(updateSkipCard)
+info:GetAttributeChangedSignal("SkipRequired"):Connect(updateSkipCard)
+info.GameRunning.Changed:Connect(updateSkipCard)
+info.Wave.Changed:Connect(function() skipChoiceWave=nil; updateSkipCard() end)
+updateSkipCard()
+
 
 
 local CTAButton = upgradeGui.TowerStats.Abilities.CTA
@@ -3494,40 +3492,30 @@ local pressedSize = originalSize - UDim2.new(0, 6, 0, 6)
 local inTweenInfo = TweenInfo.new(0.02, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local outTweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 gui.SkipFrame.UpgradeArea.ButtonArea.Skip.Upgrade.Activated:Connect(function()
-	gui.Sounds.Skip:Play()
-	local shrink = TweenService:Create(gui.SkipFrame.UpgradeArea.ButtonArea.Skip.Upgrade, inTweenInfo, { Size = pressedSize })
-	local grow = TweenService:Create(gui.SkipFrame.UpgradeArea.ButtonArea.Skip.Upgrade, outTweenInfo, { Size = originalSize })
-	shrink:Play()
-	shrink.Completed:Wait()
-	grow:Play()
-	gui.SkipFrame.UpgradeArea.ButtonArea.Skip.Visible = false
-	gui.SkipFrame.UpgradeArea.ButtonArea.Pass.Visible = false
-	gui.SkipFrame.Visible = false
-	voteSkip:InvokeServer()
+ local wave=info.Wave.Value
+ if info:GetAttribute("SkipOpen")~=true or skipChoiceWave==wave then return end
+ skipChoiceWave=wave; updateSkipCard(); gui.Sounds.Skip:Play()
+ local button=gui.SkipFrame.UpgradeArea.ButtonArea.Skip.Upgrade
+ local shrink=TweenService:Create(button,inTweenInfo,{Size=pressedSize})
+ local grow=TweenService:Create(button,outTweenInfo,{Size=originalSize})
+ shrink.Completed:Once(function() grow:Play() end); shrink:Play()
+ local ok,accepted=pcall(function() return voteSkip:InvokeServer(wave) end)
+ if (not ok or accepted==false) and info.Wave.Value==wave then skipChoiceWave=nil; updateSkipCard() end
 end)
 local originalSize = gui.SkipFrame.UpgradeArea.ButtonArea.Pass.Upgrade.Size
 local pressedSize = originalSize - UDim2.new(0, 6, 0, 6) 
 local inTweenInfo = TweenInfo.new(0.02, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local outTweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 gui.SkipFrame.UpgradeArea.ButtonArea.Pass.Upgrade.Activated:Connect(function()
-	gui.Sounds.Skip:Play()
-	local shrink = TweenService:Create(gui.SkipFrame.UpgradeArea.ButtonArea.Pass.Upgrade, inTweenInfo, { Size = pressedSize })
-	local grow = TweenService:Create(gui.SkipFrame.UpgradeArea.ButtonArea.Pass.Upgrade, outTweenInfo, { Size = originalSize })
-	shrink:Play()
-	shrink.Completed:Wait()
-	grow:Play()
-	gui.SkipFrame.UpgradeArea.ButtonArea.Skip.Visible = false
-	gui.SkipFrame.UpgradeArea.ButtonArea.Pass.Visible = false
-	gui.SkipFrame.Visible = false
+ local wave=info.Wave.Value
+ if info:GetAttribute("SkipOpen")~=true or skipChoiceWave==wave then return end
+ skipChoiceWave=wave; updateSkipCard(); gui.Sounds.Skip:Play()
+ local button=gui.SkipFrame.UpgradeArea.ButtonArea.Pass.Upgrade
+ local shrink=TweenService:Create(button,inTweenInfo,{Size=pressedSize})
+ local grow=TweenService:Create(button,outTweenInfo,{Size=originalSize})
+ shrink.Completed:Once(function() grow:Play() end); shrink:Play()
 end)
-
-workspace.Info.VoteSkipValue.Changed:Connect(function()
-	if workspace.Info.PlrValue.Value > 1 then
-		gui.SkipFrame.Title.Text = "Skip Wave? (" .. workspace.Info.VoteSkipValue.Value .. "/" .. (workspace.Info.PlrValue.Value - 1) .. ")"
-	else
-		gui.SkipFrame.Title.Text = "Skip Wave? (" .. workspace.Info.VoteSkipValue.Value .. "/" .. workspace.Info.PlrValue.Value .. ")"
-	end
-end)
+workspace.Info.VoteSkipValue.Changed:Connect(updateSkipCard)
 
 SpeedUpCooldown.OnClientEvent:Connect(function()
 	gui.FullSettings.SettingsArea.Timescale.Default.Button.Interactable = false

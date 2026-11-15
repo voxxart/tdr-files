@@ -16,13 +16,10 @@ local SpeedupFunction = ReplicatedStorage.Functions:WaitForChild("SpeedUp1")
 local SpeedupFunction2 = ReplicatedStorage.Functions:WaitForChild("SpeedUp2")
 local CooldownSpeedUP = ReplicatedStorage.Events:WaitForChild("SpeedupCooldown")
 
-local voteSkipValue = workspace.Info.VoteSkipValue
-local m = workspace.Info.Min
-local s = workspace.Info.Sec
-local st = workspace.Info.SkipTime
 
 local Match = require(game.ServerScriptService.Simulation.MatchService)
 local EventCurrency = require(game.ServerScriptService.EventCurrencySystem.Service)
+local Waves = require(game.ServerScriptService.Simulation.WaveService)
 local round = {}
 local votes = {}
 local ModifierVotes = {}
@@ -62,23 +59,25 @@ function round.StartGame()
 
 	for wave=1, waves do
 		if not Match.IsCurrent(generation) then return end
+		Waves.Begin(wave, generation, wave == waves)
 		info.Wave.Value = wave
 		info.Message.Value = ""
 
-		if mode == "Easy" then
-			round.GetEasy(wave, map)
-		end
-		if mode == "Normal" then
-			round.GetNormal(wave, map)
-		end
-		if mode == "Hard" then
-			round.GetHard(wave, map)
-		end
-
-		if not Match.IsCurrent(generation) then return end
-		repeat
-			if not Match.Wait(generation, 1) then return end
-		until #workspace.Mobs:GetChildren() == 0 or not info.GameRunning.Value or (m.Value <= 0 and s.Value <= 0)
+  local spawnWave=if mode=="Easy" then round.GetEasy elseif mode=="Normal" then round.GetNormal else round.GetHard
+  local currentWave=wave
+  local scopedMob={Spawn=function(...)
+   if Match.IsCurrent(generation) then return mob.Spawn(...) end
+  end}
+  Waves.Spawn(generation,function() spawnWave(currentWave,map,scopedMob) end)
+  while Match.IsCurrent(generation) and not Waves.CanAdvance() do
+   if Waves.Failed==generation then
+    info.Message.Value="GAME OVER"; info.GameRunning.Value=false; Waves.Close(); return
+   end
+   if not Match.Wait(generation,0.05) then Waves.Close(); return end
+  end
+  if not Match.IsCurrent(generation) then Waves.Close(); return end
+  local skipped=Waves.State.Skipped
+  Waves.Close()
 
 		if info.GameRunning.Value and wave == waves then
 			EventCurrency.CompleteVictory(generation)
@@ -190,15 +189,15 @@ function round.StartGame()
 			events.SkipWaveHide:FireAllClients()
 			if reward > 0 then
 				info.Message.Value = "Wave Reward: $" .. reward
-				if not Match.Wait(generation, 2) then return end
+				if not skipped and not Match.Wait(generation, 2) then return end
 			else
 				info.Message.Value = ""
 			end
 			
 
 			local instant = workspace.Info:FindFirstChild("ForceNextWaveInstant")
-			if instant and instant.Value == true then
-				instant.Value = false -- consume it (only skips once)
+			if skipped or (instant and instant.Value == true) then
+    if instant then instant.Value=false end
 			else
 				for i = 5, 1, -1 do
 					if i < 10 then
@@ -526,23 +525,8 @@ function round.ProcessModifierVote(player, vote)
 end
 events:WaitForChild("VoteForModifier").OnServerEvent:Connect(round.ProcessModifierVote)
 
-function round.Skip()
-	voteSkipValue.Value += 1
-	if workspace.Info.PlrValue.Value > 1 then
-		if voteSkipValue.Value == (workspace.Info.PlrValue.Value - 1) then
-			ReplicatedStorage.Events.SkipButton:FireAllClients(true,true)
-			voteSkipValue.Value = 0
-			m.Value = 0
-			s.Value = 0
-		end
-	elseif workspace.Info.PlrValue.Value == 1 then
-		if voteSkipValue.Value == workspace.Info.PlrValue.Value then
-			ReplicatedStorage.Events.SkipButton:FireAllClients(true,true)
-			voteSkipValue.Value = 0
-			m.Value = 0
-			s.Value = 0
-		end
-	end
+function round.Skip(player,wave)
+ return Waves.Vote(player,wave)
 end
 voteSkip.OnServerInvoke = round.Skip
 
@@ -594,7 +578,8 @@ SpeedupFunction.OnServerInvoke = round.SpeedUp
 SpeedupFunction2.OnServerInvoke = round.SpeedUp2
 
 
-function round.GetEasy(wave, map)
+function round.GetEasy(wave, map, spawnMob)
+ local mob=spawnMob or mob
 	if wave == 1 then m.Value = 1 ; s.Value = 0 ; st.Value = 045 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
 		mob.Spawn("Noob", 7, 0.28, 1, 1, map)
 	elseif wave == 2 then m.Value = 1 ; s.Value = 0 ; st.Value = 045 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
@@ -676,7 +661,8 @@ function round.GetEasy(wave, map)
 	end
 end
 
-function round.GetNormal(wave, map)
+function round.GetNormal(wave, map, spawnMob)
+ local mob=spawnMob or mob
 	if wave == 1 then m.Value = 1 ; s.Value = 0 ; st.Value = 045 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
 		mob.Spawn("Zombie", 8,0.28 ,1 ,1 , map)
 	elseif wave == 2 then m.Value = 1 ; s.Value = 0 ; st.Value = 045 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
@@ -791,7 +777,8 @@ function round.GetNormal(wave, map)
 	end
 end
 
-function round.GetHard(wave, map)
+function round.GetHard(wave, map, spawnMob)
+ local mob=spawnMob or mob
 	if wave == 1 then m.Value = 1 ; s.Value = 0 ; st.Value = 045 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
 		mob.Spawn("Peasant", 12,0.28 ,1 ,1 , map)
 	elseif wave == 2 then m.Value = 1 ; s.Value = 0 ; st.Value = 045 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
