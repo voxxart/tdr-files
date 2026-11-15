@@ -54,8 +54,8 @@ local config={QuotasEnabled=false,Enabled=true,CurrencyKey='EventCurrency',DropC
 local profiles={[1]={Coins=100,EventCurrency=10},[2]={Coins=200}}
 local writes=0; local stored={}
 local db={GetAsync=function(_,id) return profiles[id] end,UpdateAsync=function(_,id,fn) writes+=1; stored[id]=fn() end}
-local loaded={config=config,match=match}
-local game={ReplicatedStorage=rep,ServerScriptService={Simulation={MatchService='match'},EventCurrencySystem={Wallet='wallet'}}}
+local loaded={config=config,match=match,rewards={ApplyXP=function(amount) return amount end}}
+local game={ReplicatedStorage=rep,ServerScriptService={Simulation={MatchService='match',MatchRewards='rewards'},EventCurrencySystem={Wallet='wallet'}}}
 function game:GetService(key)
  if key=='ReplicatedStorage' then return rep elseif key=='Players' then return players elseif key=='RunService' then return {Heartbeat=beat,IsStudio=function() return true end}
  elseif key=='DataStoreService' then return {GetDataStore=function() return db end} end

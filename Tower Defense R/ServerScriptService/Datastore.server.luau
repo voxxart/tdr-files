@@ -9,6 +9,7 @@ local events = ReplicatedStorage:WaitForChild("Events")
 local exitEvent = events:WaitForChild("ExitGame")
 local GetMedalStatus = ReplicatedStorage.Functions:WaitForChild("GetMedalStatus")
 
+local MatchRewards = require(game.ServerScriptService.Simulation.MatchRewards)
 local data = {}
 local disconnectSaves = 0
 local EventWallet = require(game.ServerScriptService.EventCurrencySystem.Wallet)
@@ -468,6 +469,7 @@ local function saveData(player)
 	------------------------------------------------
 	-- APPLY DATA
 	------------------------------------------------
+	Exp = MatchRewards.ApplyXP(Exp)
 	playerData.Coins += Coins
 	playerData.Exp += Exp
 	playerData.Gems += Gems

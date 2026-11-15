@@ -4512,6 +4512,8 @@ local function DisplayEndScreen(status)
 		gems = math.round(gems * 1.40)
 	end
 
+	exp = require(ReplicatedStorage.GameModules.EXPWeekend).ApplyXP(exp, info:GetAttribute("EXPWeekendActive") == true)
+
 	-- Update UI with calculated rewards
 	screen.Outcome.UpgradeName.Text = status
 	local rewardSound = gui.Sounds:FindFirstChild("Reward")

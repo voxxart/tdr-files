@@ -1,5 +1,6 @@
 local RunService = game:GetService('RunService')
 local MatchClock = require(script.Parent.MatchClock)
+local MatchRewards = require(script.Parent.MatchRewards)
 local Info = workspace:WaitForChild('Info')
 local Running = Info:WaitForChild('GameRunning')
 local Speed = Info:WaitForChild('GameSpeed')
@@ -11,6 +12,7 @@ local observedRunning = false
 function MatchService.Begin()
 	observedRunning = true
 	local generation = clock:Begin()
+ MatchRewards.Begin(generation)
 	Running.Value = true
 	return generation
 end
@@ -46,7 +48,7 @@ end
 
 local function runningChanged()
 	if Running.Value and not observedRunning then
-		clock:Begin()
+		MatchRewards.Begin(clock:Begin())
 	elseif not Running.Value then
 		clock:Stop()
 	end
