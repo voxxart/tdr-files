@@ -5681,7 +5681,7 @@ local function LoadGui()
  end
  local function showReward(change)
   -- This banner is only for wave rewards; server phase/status text stays private to its UI.
-  if type(change)~="string" or not change:match("^Wave Reward:%s*%$") then return end
+  if type(change)~="string" or not change:match("^%+%$[%d,]+%s+Wave Bonus%s*$") then return end
   messageVersion+=1
   local version=messageVersion
   cancelTween()
