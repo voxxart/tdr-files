@@ -1,5 +1,7 @@
 # Batch 26: reliable skip votes and overlapping wave spawns
 
+**Required follow-up:** install [batch 27](studio-batch-27-wave-timing-fix.md) to fix the authored wave timing references.
+
 Install together, then restart the Studio play session.
 
 ## Replace
@@ -21,7 +23,7 @@ A passed skip advances to the next wave without waiting for the current wave's s
 
 Round no longer blocks inside GetEasy/GetNormal/GetHard: it launches one scoped spawn job per wave and monitors progression independently. Pending jobs are tracked across overlapping waves. Clearing the map between groups does not finish a wave while spawns are pending. Old jobs stop on match end, and guarded group calls cannot start spawning into a later match generation.
 
-The final wave is not skippable. Victory requires all pending jobs from every overlapping wave to finish and the Mobs folder to be empty. Final timer expiry alone cannot declare victory. A spawn-job error reports a warning and ends the match as GAME OVER rather than silently granting completion.
+The final wave is not skippable. Victory requires all pending jobs from every overlapping wave to finish and the Mobs folder to be empty. Final timer expiry alone cannot declare victory. A spawn-job error reports a warning and interrupts wave progression rather than silently granting completion (batch 27).
 
 ## Votes and UI
 
@@ -34,7 +36,7 @@ The previous quorum is preserved: one vote in solo; otherwise all but one player
 The timer is driven by the shared game clock, so pause and timescale changes apply consistently. The old per-Wave.Changed countdown workers are removed. Empty-map gaps no longer stop the timer prematurely.
 
 - **Optional Number attribute** `workspace.Info.WaveDurationSeconds`: explicit duration for each new wave.
-- Otherwise, the existing Min/Sec values at WaveService initialization define the duration. If both are zero, the fallback is **90 seconds**. Each wave starts with a fresh duration rather than inheriting the prior wave's zeroed timer.
+- Otherwise, the authored per-wave timing in Main.Round defines the duration (batch 27). For definitions without authored timing, the existing Min/Sec values at WaveService initialization define the duration. If both are zero, the fallback is **90 seconds**. Each wave starts with a fresh duration rather than inheriting the prior wave's zeroed timer.
 - Existing **Value** `workspace.Info.SkipTime`: remaining-time threshold for opening skip. Its existing MMSS encoding is preserved: `30` means 00:30 remaining, `110` means 01:10 remaining. Set it at or above the full wave duration to open immediately. A zero threshold leaves no manual skip window before timeout.
 - Min/Sec remain the replicated countdown mirrors. Set WaveDurationSeconds to configure duration, rather than editing the mirrors during a wave.
 - `workspace.Info.WaveSpawning` is a replicated boolean attribute indicating any pending wave spawn job, including overlapping jobs from earlier waves.

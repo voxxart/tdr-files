@@ -68,7 +68,7 @@ function round.GetEasy(wave,_,scopedMob)
  scopedMob.Spawn('Wave'..wave,2,4)
 end
 local starter={GameGui={Sounds={Countdown={Play=function() end}}}}
-local roundEnv=setmetatable({round=round,info=info,Match=match,Waves=Waves,Players=players,mob=mob,workspace=world,
+local roundEnv=setmetatable({waveTiming={Easy={}},round=round,info=info,Match=match,Waves=Waves,Players=players,mob=mob,workspace=world,
  EventCurrency={BeginMatch=function() end,CompleteVictory=function() completed+=1 end},ServerStorage={Modes={FindFirstChild=function() return {WaveReward={Value=100},RewardMultiplier={Value=10}} end}},
  events=events,game={StarterGui=starter,GetService=function(_,name) if name=='Players' then return players end; assert(name=='BadgeService'); return {UserHasBadgeAsync=function() return true end} end}}, {__index=env})
 local init=assert(loadstring(sources.round)); setfenv(init,roundEnv); init()
@@ -112,6 +112,11 @@ Waves.Spawn(old,function() if match.Wait(old,10) then error('old spawn continued
 tick(0.05); generation+=1; Waves.Begin(1,generation,false)
 assert(Waves.Pending==0)
 tick(11); assert(Waves.Pending==0 and #failures==0)
+Waves.Begin(2,generation,false,{Duration=60,SkipRemaining=45})
+assert(info.Min.Value==1 and info.Sec.Value==0 and info.SkipTime.Value==45 and not Waves.State.Open)
+now+=15; Waves.Step(); assert(Waves.State.Open,'authored skip time must be owned by the wave controller')
+Waves.Spawn(generation,function() error('fixture spawn failure') end); tick(0.05)
+assert(Waves.Failed==generation and info.GameRunning.Value and not Waves.CanAdvance(),'a spawn fault must not instantly defeat the match or silently clear the wave')
 print('Wave overlap passed: actual round starts next wave mid-spawn, preserves all groups, per-wave votes, reward once, pause, final-wave completion and old-generation isolation')
 '''
 with tempfile.NamedTemporaryFile('w',suffix='.luau') as f:

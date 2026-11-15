@@ -31,12 +31,13 @@ local function publish(exclude)
  local spawning=Service.Pending>0
  if spawning~=lastSpawning then info:SetAttribute('WaveSpawning',spawning); lastSpawning=spawning end
 end
-function Service.Begin(wave,generation,final)
+function Service.Begin(wave,generation,final,timing)
  if Service.Generation~=generation then Service.Generation=generation; Service.Pending=0; Service.Failed=nil end
- local duration=info:GetAttribute('WaveDurationSeconds') or configuredDuration
+ local duration=info:GetAttribute('WaveDurationSeconds') or (timing and timing.Duration) or configuredDuration
  duration=math.max(1,duration)
  local encoded=math.max(0,info.SkipTime.Value)
- local skipRemaining=math.floor(encoded/100)*60+encoded%100
+ local skipRemaining=if timing then timing.SkipRemaining else math.floor(encoded/100)*60+encoded%100
+ info.SkipTime.Value=math.floor(skipRemaining/60)*100+skipRemaining%60
  Service.State:Begin(wave,Match.Now(),duration,skipRemaining,final)
  lastSecond=nil; publish()
 end

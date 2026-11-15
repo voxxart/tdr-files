@@ -7,6 +7,94 @@ local mob = require(script.Parent.Mob)
 local unit = require(script.Parent.Unit)
 local info = workspace.Info
 
+-- Authored per-wave timings, captured before launching asynchronous spawn jobs.
+local waveTiming={
+ Easy={
+  [1]={Duration=60,SkipRemaining=45},
+  [2]={Duration=60,SkipRemaining=45},
+  [3]={Duration=60,SkipRemaining=45},
+  [4]={Duration=70,SkipRemaining=55},
+  [5]={Duration=70,SkipRemaining=55},
+  [6]={Duration=85,SkipRemaining=70},
+  [7]={Duration=85,SkipRemaining=70},
+  [8]={Duration=180,SkipRemaining=160},
+  [9]={Duration=85,SkipRemaining=70},
+  [10]={Duration=85,SkipRemaining=70},
+  [11]={Duration=85,SkipRemaining=70},
+  [12]={Duration=85,SkipRemaining=70},
+  [13]={Duration=180,SkipRemaining=165},
+  [14]={Duration=145,SkipRemaining=175},
+  [15]={Duration=145,SkipRemaining=175},
+  [16]={Duration=145,SkipRemaining=175},
+  [17]={Duration=305,SkipRemaining=275},
+  [18]={Duration=305,SkipRemaining=275},
+  [19]={Duration=600,SkipRemaining=530},
+  [20]={Duration=6000,SkipRemaining=530},
+ },
+ Normal={
+  [1]={Duration=60,SkipRemaining=45},
+  [2]={Duration=60,SkipRemaining=45},
+  [3]={Duration=60,SkipRemaining=45},
+  [4]={Duration=120,SkipRemaining=105},
+  [5]={Duration=125,SkipRemaining=105},
+  [6]={Duration=60,SkipRemaining=45},
+  [7]={Duration=60,SkipRemaining=45},
+  [8]={Duration=75,SkipRemaining=55},
+  [9]={Duration=75,SkipRemaining=55},
+  [10]={Duration=75,SkipRemaining=55},
+  [11]={Duration=80,SkipRemaining=59},
+  [12]={Duration=80,SkipRemaining=59},
+  [13]={Duration=70,SkipRemaining=59},
+  [14]={Duration=120,SkipRemaining=105},
+  [15]={Duration=180,SkipRemaining=165},
+  [16]={Duration=120,SkipRemaining=105},
+  [17]={Duration=120,SkipRemaining=105},
+  [18]={Duration=180,SkipRemaining=150},
+  [19]={Duration=180,SkipRemaining=150},
+  [20]={Duration=180,SkipRemaining=120},
+  [21]={Duration=180,SkipRemaining=120},
+  [22]={Duration=180,SkipRemaining=120},
+  [23]={Duration=180,SkipRemaining=120},
+  [24]={Duration=600,SkipRemaining=480},
+  [25]={Duration=300,SkipRemaining=280},
+  [26]={Duration=5999,SkipRemaining=280},
+ },
+ Hard={
+  [1]={Duration=60,SkipRemaining=45},
+  [2]={Duration=60,SkipRemaining=45},
+  [3]={Duration=60,SkipRemaining=45},
+  [4]={Duration=60,SkipRemaining=45},
+  [5]={Duration=120,SkipRemaining=100},
+  [6]={Duration=120,SkipRemaining=100},
+  [7]={Duration=120,SkipRemaining=100},
+  [8]={Duration=120,SkipRemaining=100},
+  [9]={Duration=120,SkipRemaining=100},
+  [10]={Duration=180,SkipRemaining=150},
+  [11]={Duration=120,SkipRemaining=90},
+  [12]={Duration=110,SkipRemaining=72},
+  [13]={Duration=120,SkipRemaining=90},
+  [14]={Duration=120,SkipRemaining=90},
+  [15]={Duration=120,SkipRemaining=90},
+  [16]={Duration=120,SkipRemaining=90},
+  [17]={Duration=300,SkipRemaining=265},
+  [18]={Duration=120,SkipRemaining=90},
+  [19]={Duration=120,SkipRemaining=90},
+  [20]={Duration=369,SkipRemaining=1},
+  [21]={Duration=150,SkipRemaining=90},
+  [22]={Duration=150,SkipRemaining=90},
+  [23]={Duration=270,SkipRemaining=90},
+  [24]={Duration=150,SkipRemaining=90},
+  [25]={Duration=150,SkipRemaining=90},
+  [26]={Duration=150,SkipRemaining=90},
+  [27]={Duration=150,SkipRemaining=90},
+  [28]={Duration=369,SkipRemaining=1},
+  [29]={Duration=270,SkipRemaining=210},
+  [30]={Duration=270,SkipRemaining=210},
+  [31]={Duration=270,SkipRemaining=210},
+  [32]={Duration=5999,SkipRemaining=1},
+ },
+}
+
 local GM = 1
 
 local voteSkip = ReplicatedStorage.Functions:WaitForChild("VoteSkip")
@@ -59,7 +147,7 @@ function round.StartGame()
 
 	for wave=1, waves do
 		if not Match.IsCurrent(generation) then return end
-		Waves.Begin(wave, generation, wave == waves)
+		Waves.Begin(wave, generation, wave == waves, waveTiming[mode] and waveTiming[mode][wave])
 		info.Wave.Value = wave
 		info.Message.Value = ""
 
@@ -71,7 +159,7 @@ function round.StartGame()
   Waves.Spawn(generation,function() spawnWave(currentWave,map,scopedMob) end)
   while Match.IsCurrent(generation) and not Waves.CanAdvance() do
    if Waves.Failed==generation then
-    info.Message.Value="GAME OVER"; info.GameRunning.Value=false; Waves.Close(); return
+    info.Message.Value="Wave spawning interrupted"; Waves.Close(); return
    end
    if not Match.Wait(generation,0.05) then Waves.Close(); return end
   end
@@ -580,80 +668,80 @@ SpeedupFunction2.OnServerInvoke = round.SpeedUp2
 
 function round.GetEasy(wave, map, spawnMob)
  local mob=spawnMob or mob
-	if wave == 1 then m.Value = 1 ; s.Value = 0 ; st.Value = 045 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	if wave == 1 then
 		mob.Spawn("Noob", 7, 0.28, 1, 1, map)
-	elseif wave == 2 then m.Value = 1 ; s.Value = 0 ; st.Value = 045 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 2 then
 		mob.Spawn("Noob", 11, 0.28, 1, 1, map)
-	elseif wave == 3 then m.Value = 1 ; s.Value = 0 ; st.Value = 045 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 3 then
 		mob.Spawn("Noob", 11, 0.28, 1, 1, map)
 		mob.Spawn("Energetic Noob", 4, 0.28, 1.5, 1, map)
-	elseif wave == 4 then m.Value = 1 ; s.Value = 10 ; st.Value = 055 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 4 then
 		mob.Spawn("Energetic Noob", 12, 0.28, 1.1, 1, map)
 		mob.Spawn("Noob", 10, 0.28, 1, 1, map)
-	elseif wave == 5 then m.Value = 1 ; s.Value = 10 ; st.Value = 055 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 5 then
 		mob.Spawn("Noob", 14, 0.28, 1, 1, map)
 		mob.Spawn("Energetic Noob", 8, 0.28, 2, 1, map)
-	elseif wave == 6 then m.Value = 1 ; s.Value = 25 ; st.Value = 0110 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 6 then
 		mob.Spawn("Armored Noob", 3, 0.28, 1, 1, map)
 		mob.Spawn("Noob", 9, 0.28, 1, 1, map)
 		mob.Spawn("Energetic Noob", 14, 0.28, 1.5, 1, map)
 		mob.Spawn("Armored Noob", 11, 0.28, 1.1, 1, map)
-	elseif wave == 7 then m.Value = 1 ; s.Value = 25 ; st.Value = 0110 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 7 then
 		mob.Spawn("Armored Noob", 25, 0.28, 1, 1, map)
 		mob.Spawn("Noob", 12, 0.28, 1, 1, map)
-	elseif wave == 8 then m.Value = 3 ; s.Value = 0 ; st.Value = 0240; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 8 then
 		mob.Spawn("Armored Noob", 11, 0.28, 1, 1, map)
 		mob.Spawn("Noob Soldier", 1, 1.25, 1.05, 1, map)
-	elseif wave == 9 then m.Value = 1 ; s.Value = 25 ; st.Value = 0110 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 9 then
 		mob.Spawn("Energetic Noob", 10, 0.28, 1, 1.69, map)
 		mob.Spawn("Noob", 12, 0.28, 1, 1, map)
 		mob.Spawn("Armored Noob", 20, 0.28, 1, 1, map)
-	elseif wave == 10 then m.Value = 1 ; s.Value = 25 ; st.Value = 0110 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 10 then
 		mob.Spawn("Aviator Noob", 5, 0.28, 1, 1, map)
 		mob.Spawn("Energetic Noob", 8, 0.28, 1, 2, map)
 		mob.Spawn("Armored Noob", 13, 0.28, 3.5, 0.8, map)
-	elseif wave == 11 then m.Value = 1 ; s.Value = 25 ; st.Value = 0110 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 11 then
 		mob.Spawn("Noob Soldier", 1, 1.25, 2, 0.8, map)
 		mob.Spawn("Aviator Noob", 8, 0.28, 2, 0.65, map)
 		mob.Spawn("Armored Noob", 11, 0.28, 1.25, 1, map)
 		mob.Spawn("Noob Soldier", 1, 1.25, 1, 1, map)
-	elseif wave == 12 then m.Value = 1 ; s.Value = 25 ; st.Value = 0110 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 12 then
 		mob.Spawn("Aviator Noob", 1, 0.28, 10, 0.65, map)
 		mob.Spawn("Noob Soldier", 3, 0.5, 1, 1, map)
 		mob.Spawn("Shadow Noob", 25, 0.28, 1, 1, map)
 		mob.Spawn("Armored Noob", 20, 0.28, 1, 1, map)
-	elseif wave == 13 then m.Value = 3 ; s.Value = 0 ; st.Value = 0245 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 13 then
 		mob.Spawn("Shadow Noob", 14, 0.28, 2.5, 1, map)
 		mob.Spawn("Noob Soldier", 1, 1.25, 2, 1.25, map)
 		mob.Spawn("Noob Doctor", 1, 0.28, 1, 1, map)
-	elseif wave == 14 then m.Value = 2 ; s.Value = 25 ; st.Value = 0255 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 14 then
 		mob.Spawn("Aviator Noob", 5, 0.28, 1, 0.65, map)
 		mob.Spawn("Noob Soldier", 1, 0.5, 2.75, 1, map)
 		mob.Spawn("Shadow Noob", 20, 0.28, 1.15, 1, map)
 		mob.Spawn("Noob Doctor", 1, 0.28, 0.5, 1.5, map)
-	elseif wave == 15 then m.Value = 2 ; s.Value = 25 ; st.Value = 0255 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 15 then
 		mob.Spawn("Noob Engineer", 1, 0.28, 2, 1, map)
 		mob.Spawn("Armored Noob", 18, 0.5, 1.5, 1, map)
 		mob.Spawn("Aviator Noob", 7, 0.35, 1, 0.8, map)
 		mob.Spawn("Shadow Noob", 12, 0.28, 2.5, 1, map)
 		mob.Spawn("Noob Engineer", 1, 0.28, 2.25, 1, map)
-	elseif wave == 16 then m.Value = 2 ; s.Value = 25 ; st.Value = 0255 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 16 then
 		mob.Spawn("Noob Soldier", 3, 0.5, 1.85, 1, map)
 		mob.Spawn("Aviator Noob", 15, 0.35, 1, 0.8, map)
 		mob.Spawn("Noob Engineer", 1, 0.28, 1.75, 1, map)
 		mob.Spawn("Noob Doctor", 1, 0.28, 0.5, 1.5, map)
-	elseif wave == 17 then m.Value = 5 ; s.Value = 05 ; st.Value = 0435 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 17 then
 		mob.Spawn("Noob Gaurdian", 1, 0.5, 1.2, 1, map)
 		mob.Spawn("Noob Soldier", 4, 0.28, 0.35, 1.5, map)
 		mob.Spawn("Shadow Noob", 30, 0.28, 1, 1, map)
-	elseif wave == 18 then m.Value = 5 ; s.Value = 05 ; st.Value = 0435 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 18 then
 		mob.Spawn("Noob Gaurdian", 1, 0.5, 1, 1, map)
 		mob.Spawn("Noob Doctor", 1, 0.28, 0.5, 1, map)
 		mob.Spawn("Noob Gaurdian", 1, 0.5, 0.5, 1.25, map)
 		mob.Spawn("Noob Engineer", 1, 0.28, 2, 1, map)
-	elseif wave == 19 then m.Value = 10 ; s.Value = 00 ; st.Value = 0850 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 19 then
 		mob.Spawn("Noob Juggernaut", 1, 0.28, 0.67, 1, map)
-	elseif wave == 20 then m.Value = 99 ; s.Value = 60 ; st.Value = 0850 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 20 then
 		ReplicatedStorage.Events.FinalWave:FireAllClients(Color3.new(1, 0.333333, 0))
 		mob.Spawn("Noob Doctor", 1, 0.28, 0.8, 1, map)
 		mob.Spawn("Noob Gaurdian", 1, 0.5, 0.67, 1.15, map)
@@ -663,86 +751,86 @@ end
 
 function round.GetNormal(wave, map, spawnMob)
  local mob=spawnMob or mob
-	if wave == 1 then m.Value = 1 ; s.Value = 0 ; st.Value = 045 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	if wave == 1 then
 		mob.Spawn("Zombie", 8,0.28 ,1 ,1 , map)
-	elseif wave == 2 then m.Value = 1 ; s.Value = 0 ; st.Value = 045 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 2 then
 		mob.Spawn("Zombie", 13,0.28 ,1 ,1 , map)
-	elseif wave == 3 then m.Value = 1 ; s.Value = 0 ; st.Value = 045 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 3 then
 		mob.Spawn("Speedy", 5,0.28 ,1 ,1 , map)
 		mob.Spawn("Zombie", 11,0.28 ,1 ,1 , map)
 		mob.Spawn("Speedy", 3,0.28 ,1 ,1 , map)
-	elseif wave == 4 then m.Value = 2 ; s.Value = 0 ; st.Value = 0145 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 4 then
 		mob.Spawn("Zombie", 9,0.28 ,1.45 ,1 , map)
 		mob.Spawn("Speedy", 7,0.22 ,1.25 ,0.8 , map)
 		mob.Spawn("Zombie", 6,0.28 ,1.25,1 , map)
 		mob.Spawn("Speedy", 2,0.22 ,1.65 ,1 , map)
-	elseif wave == 5 then m.Value = 2 ; s.Value = 5 ; st.Value = 0145 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 5 then
 		mob.Spawn("Armored Zombie", 11,0.28 ,2.2 ,1 , map)
 		mob.Spawn("Speedy", 7,0.22 ,1.67 ,1.25 , map)
 		mob.Spawn("Zombie", 5,0.28 ,1,2 , map)
 		mob.Spawn("Armored Zombie", 3,0.28 ,1.25 ,1 , map)
-	elseif wave == 6 then m.Value = 1 ; s.Value = 0 ; st.Value = 045 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 6 then
 		mob.Spawn("Armored Zombie", 25,0.28 ,2 ,1 , map)
 		mob.Spawn("Speedy", 5,0.28 ,1 ,1.5 , map)
-	elseif wave == 7 then m.Value = 1 ; s.Value = 0 ; st.Value = 045 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 7 then
 		mob.Spawn("Zombie", 7,0.28 ,1,1 , map)
 		mob.Spawn("Armored Zombie", 4,0.28 ,1.25 ,1 , map)
 		mob.Spawn("Executioner", 1,0.28 ,2.02 ,1 , map)
-	elseif wave == 8 then m.Value = 1 ; s.Value = 15 ; st.Value = 055 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 8 then
 		mob.Spawn("Armored Zombie", 8,0.25 ,2 ,1 , map)
 		mob.Spawn("Zombie", 20,0.20 ,1,1 , map)
 		mob.Spawn("Armored Zombie", 12,0.25 ,5,1 , map)
 		mob.Spawn("Speedy", 5,0.18,1,1 , map)
-	elseif wave == 9 then m.Value = 1 ; s.Value = 15 ; st.Value = 055 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 9 then
 		mob.Spawn("Executioner", 1,2 ,1.45 ,1 , map)
 		mob.Spawn("Spy", 17,0.25 ,1.2 ,1 , map)
 		mob.Spawn("Executioner", 1,2 ,1.8,1 , map)
-	elseif wave == 10 then m.Value = 1 ; s.Value = 15 ; st.Value = 055 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 10 then
 		mob.Spawn("Executioner", 1,1 ,1.3 ,1 , map)
 		mob.Spawn("Spy", 15,0.25 ,1 ,1 , map)
 		mob.Spawn("Armored Zombie", 30,0.25 ,2 ,1 , map)
 		mob.Spawn("Executioner", 1,2 ,1.7 ,1 , map)	
-	elseif wave == 11 then m.Value = 1 ; s.Value = 20 ; st.Value = 059 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 11 then
 		mob.Spawn("Spy", 25,0.25 ,1.15 ,1 , map)
-	elseif wave == 12 then m.Value = 1 ; s.Value = 20 ; st.Value = 059 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 12 then
 		mob.Spawn("Executioner", 1,0.25 ,0.95 ,2.1 , map)
 		mob.Spawn("Pilot", 7,0.25 ,0.8 ,0.8 , map)
-	elseif wave == 13 then m.Value = 1 ; s.Value = 10 ; st.Value = 059 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 13 then
 		mob.Spawn("Spy", 15,0.25 ,2 ,1.25 , map)
 		mob.Spawn("Pilot", 5,0.25 ,0.8 ,0.8 , map)
 		mob.Spawn("Spy", 8,0.25 ,1 ,1.75 , map)
-	elseif wave == 14 then m.Value = 2 ; s.Value = 0 ; st.Value = 0145 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 14 then
 		mob.Spawn("Pilot", 9,0.35 ,1.5 ,0.5, map)
-	elseif wave == 15 then m.Value = 3 ; s.Value = 0 ; st.Value = 0245 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 15 then
 		mob.Spawn("Executioner", 1,0.25 ,1.25 ,1 , map)
 		mob.Spawn("MEU", 1,1 ,1.05 ,1 , map)
 		mob.Spawn("Pilot", 4,0.25 ,2 ,0.8, map)
 		mob.Spawn("Spy", 5,0.25 ,0.5 ,1 , map)
-	elseif wave == 16 then m.Value = 2 ; s.Value = 0 ; st.Value = 0145 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 16 then
 		mob.Spawn("Executioner", 5,1 ,0.8 ,1 , map)
 		mob.Spawn("MEU", 1,1 ,1.1 ,1 , map)
-	elseif wave == 17 then m.Value = 2 ; s.Value = 0 ; st.Value = 0145 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 17 then
 		mob.Spawn("MEU", 1,3 ,2 ,1 , map)
 		mob.Spawn("MEU", 1,3 ,0.5 ,1 , map)
-	elseif wave == 18 then m.Value = 3 ; s.Value = 0 ; st.Value = 0230 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 18 then
 		mob.Spawn("Polycephaly", 5,1 ,1.25 ,1 , map)
 		mob.Spawn("Executioner", 1,1 ,1.6 ,1 , map)
 		mob.Spawn("Pilot", 4,1 ,1 ,0.8 , map)
 		mob.Spawn("MEU", 1,3 ,1 ,1 , map)
-	elseif wave == 19 then m.Value = 3 ; s.Value = 0 ; st.Value = 0230 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 19 then
 		mob.Spawn("Polycephaly", 10,1 ,1 ,1 , map)
-	elseif wave == 20 then m.Value = 3 ; s.Value = 0 ; st.Value = 0200 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 20 then
 		mob.Spawn("Brute", 1,1 ,1.125 ,1 , map)
 		mob.Spawn("Polycephaly", 3,1 ,2 ,1.35 , map)
 		mob.Spawn("MEU", 1,1.45 ,0.8 ,1 , map)
-	elseif wave == 21 then m.Value = 3 ; s.Value = 0 ; st.Value = 0200 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 21 then
 		mob.Spawn("Brute", 1,1 ,1.3 ,1 , map)
 		mob.Spawn("Infected Medic", 1,1 ,0.5 ,1 , map)
 		mob.Spawn("Pilot", 4,0.25 ,1 ,0.8 , map)
 		mob.Spawn("Spy", 13,0.25 ,1 ,1.5 , map)
-	elseif wave == 22 then m.Value = 3 ; s.Value = 0 ; st.Value = 0200 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 22 then
 		mob.Spawn("Brute", 5,3 ,0.9 ,0.75 , map)
-	elseif wave == 23 then m.Value = 3 ; s.Value = 0 ; st.Value = 0200 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 23 then
 		mob.Spawn("MEU", 3,1 ,0.75 ,1 , map)
 		mob.Spawn("Polycephaly", 4,1 ,1 ,1 , map)
 		mob.Spawn("Brute", 1,1 ,1 ,1 , map)
@@ -750,7 +838,7 @@ function round.GetNormal(wave, map, spawnMob)
 		mob.Spawn("Pilot", 1,1 ,5 ,0.7 , map)
 		mob.Spawn("Executioner", 2,1 ,1 ,0.5 , map)
 		mob.Spawn("Brute", 1,1 ,0.28 ,1 , map)
-	elseif wave == 24 then m.Value = 10 ; s.Value = 0 ; st.Value = 0800 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 24 then
 		mob.Spawn("Executioner", 7,1 ,1 ,0.5 , map)
 		mob.Spawn("Brute", 3,2.25 ,0.75 ,0.75 , map)
 		mob.Spawn("Infected Medic", 2,3 ,0.5 ,1 , map)
@@ -758,14 +846,14 @@ function round.GetNormal(wave, map, spawnMob)
 		mob.Spawn("Polycephaly", 3,1 ,2 ,0.75, map)
 		mob.Spawn("Marauder", 1,1 ,0.7 ,1.1, map)
 		mob.Spawn("Resurrected Noob Gaurdian", 1,2.25 ,0.5 ,0.325, map)
-	elseif wave == 25 then m.Value = 5 ; s.Value = 0 ; st.Value = 0440 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 25 then
 		mob.Spawn("Brute", 4,2 ,1 ,1 , map)
 		mob.Spawn("Endbringer", 1,2.25 ,1 ,1 , map)
 		mob.Spawn("Infected Medic", 8,1 ,0.8 ,1 , map)
 		mob.Spawn("Endbringer", 1,2.25 ,1.5 ,1.15 , map)
 		mob.Spawn("Pilot", 22,0.3,1 ,0.95 , map)
 		mob.Spawn("Polycephaly", 15,0.35 ,2 ,1, map)
-	elseif wave == 26 then m.Value = 99 ; s.Value = 59 ; st.Value = 0440 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 26 then
 		ReplicatedStorage.Events.FinalWave:FireAllClients(Color3.new(1, 0, 0))
 		mob.Spawn("Endbringer", 1,1 ,1 ,1 , map)
 		mob.Spawn("Polycephaly", 4,0.35 ,3.5 ,1, map)
@@ -779,78 +867,78 @@ end
 
 function round.GetHard(wave, map, spawnMob)
  local mob=spawnMob or mob
-	if wave == 1 then m.Value = 1 ; s.Value = 0 ; st.Value = 045 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	if wave == 1 then
 		mob.Spawn("Peasant", 12,0.28 ,1 ,1 , map)
-	elseif wave == 2 then m.Value = 1 ; s.Value = 0 ; st.Value = 045 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 2 then
 		mob.Spawn("Peasant", 15,0.28 ,1 ,1 , map)
-	elseif wave == 3 then m.Value = 1 ; s.Value = 0 ; st.Value = 045 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 3 then
 		mob.Spawn("Peasant", 5,0.28 ,1 ,1 , map)
 		mob.Spawn("Worker", 1,0.28 ,2,0.8 , map)
 		mob.Spawn("Peasant", 15,0.28 ,1 ,1 , map)
 		mob.Spawn("Worker", 1,0.28 ,2.5,0.8 , map)
-	elseif wave == 4 then m.Value = 1 ; s.Value = 0 ; st.Value = 045 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 4 then
 		mob.Spawn("Worker", 2,0.35 ,2,0.8 , map)
 		mob.Spawn("Peasant", 14,0.28 ,1 ,1 , map)
 		mob.Spawn("Worker", 5,0.35 ,2,0.8 , map)
-	elseif wave == 5 then m.Value = 2 ; s.Value = 0 ; st.Value = 0140 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 5 then
 		mob.Spawn("Worker", 20,0.35 ,1.8,0.8 , map)
-	elseif wave == 6 then m.Value = 2 ; s.Value = 0 ; st.Value = 0140 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 6 then
 		mob.Spawn("Worker", 4,0.35 ,1.8,0.8 , map)
 		mob.Spawn("Peasant", 23,0.28 ,1 ,1 , map)
 		mob.Spawn("Knight", 1,0.35 ,1.15,1 , map)
 		mob.Spawn("Worker", 6,0.5 ,2,0.8 , map)
-	elseif wave == 7 then m.Value = 2 ; s.Value = 0 ; st.Value = 0140 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 7 then
 		mob.Spawn("Knight", 1,0.35 ,1.5,1 , map)
 		mob.Spawn("Peasant", 10,0.28 ,1 ,1 , map)
 		mob.Spawn("Worker", 7,0.35 ,2,0.8 , map)
 		mob.Spawn("Peasant", 14,0.28 ,1 ,1 , map)
 		mob.Spawn("Knight", 1,1.5 ,2,1 , map)
-	elseif wave == 8 then m.Value = 2 ; s.Value = 0 ; st.Value = 0140 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 8 then
 		mob.Spawn("Knight", 3,0.35 ,1,1 , map)
 		mob.Spawn("Worker", 12,0.35 ,1.8,0.8 , map)
 		mob.Spawn("Knight", 1,0.35 ,1,1 , map)
 		mob.Spawn("Peasant", 10 ,0.28 ,1.5 ,1 , map)
 		mob.Spawn("Worker", 6,0.35 ,1.8,0.8 , map)
-	elseif wave == 9 then m.Value = 2 ; s.Value = 0 ; st.Value = 0140 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 9 then
 		mob.Spawn("Peasant", 18,0.28 ,1 ,1 , map)
 		mob.Spawn("Worker", 9,0.28 ,2,0.8 , map)
 		mob.Spawn("Bread Bearer", 1,0.35 ,2,0.8 , map)
 		mob.Spawn("Peasant", 14,0.28 ,1 ,1 , map)
 		mob.Spawn("Worker", 10,0.28 ,2,1 , map)
-	elseif wave == 10 then m.Value = 3 ; s.Value = 0 ; st.Value = 0230 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 10 then
 		mob.Spawn("Worker", 3,0.28 ,1.4,1 , map)
 		mob.Spawn("Marksman", 1,0.28 ,1.12 ,1.1 , map)
 		mob.Spawn("Peasant", 10,0.28 ,1 ,1 , map)
 		mob.Spawn("Bread Bearer", 1,3 ,1,0.8 , map)
 		mob.Spawn("Worker", 12,0.28 ,2,1 , map)
-	elseif wave == 11 then m.Value = 2 ; s.Value = 0 ; st.Value = 0130 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 11 then
 		mob.Spawn("Worker", 4,0.28 ,2,1 , map)
 		mob.Spawn("Bread Bearer", 1,0.35 ,2,0.8 , map)
 		mob.Spawn("Bronze", 5,0.35 ,1,1 , map)
 		mob.Spawn("Knight", 2, 0.6 ,1,1 , map)
-	elseif wave == 12 then m.Value = 1 ; s.Value = 50 ; st.Value = 0112 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 12 then
 		mob.Spawn("Peasant", 10,0.2 ,2 ,1 , map)
 		mob.Spawn("Bronze", 2,0.35 ,1,1 , map)
 		mob.Spawn("Knight", 3, 0.6 ,1,1 , map)
 		mob.Spawn("Bread Bearer", 1,1.5 ,1,0.8 , map)
 		mob.Spawn("Bronze", 1,0.35 ,1.5,1 , map)
 		mob.Spawn("Knight", 1, 0.3 ,2,1 , map)
-	elseif wave == 13 then m.Value = 2 ; s.Value = 0 ; st.Value = 0130 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 13 then
 		mob.Spawn("Marksman", 1,0.28 ,1 ,0.8 , map)
 		mob.Spawn("Bronze", 4,0.35 ,1,1 , map)
 		mob.Spawn("Wraith", 10,0.28 ,1,1 , map)
 		mob.Spawn("Bronze", 2,0.35 ,1.5,1 , map)
 		mob.Spawn("Bread Bearer", 1,1.5 ,3,0.8 , map)
 		mob.Spawn("Marksman", 1,0.28 ,0.5 ,1.75 , map)
-	elseif wave == 14 then m.Value = 2 ; s.Value = 0 ; st.Value = 0130 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 14 then
 		mob.Spawn("Wraith", 45,0.28 ,1,1.25 , map)
-	elseif wave == 15 then m.Value = 2 ; s.Value = 0 ; st.Value = 0130 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 15 then
 		mob.Spawn("Worker", 15,0.28 ,1.5,1 , map)
 		mob.Spawn("Marksman", 1,0.28 ,0.75 ,1 , map)
 		mob.Spawn("Glider", 2,3 ,1.6 ,1 , map)
 		mob.Spawn("Bread Bearer", 1,1.5 ,1,0.8 , map)
 		mob.Spawn("Wraith", 8,0.28 ,1,1 , map)
-	elseif wave == 16 then m.Value = 2 ; s.Value = 0 ; st.Value = 0130 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 16 then
 		mob.Spawn("Bronze", 12,0.35 ,1,1 , map)
 		mob.Spawn("Glider", 1,3 ,2 ,1 , map)
 		mob.Spawn("Wraith", 12,0.28 ,2,1 , map)
@@ -858,13 +946,13 @@ function round.GetHard(wave, map, spawnMob)
 		mob.Spawn("Knight", 5, 0.3 ,2,1 , map)
 		mob.Spawn("Bread Bearer", 1,1.5 ,1,0.8 , map)
 		mob.Spawn("Bronze", 4,0.35 ,3,1 , map)
-	elseif wave == 17 then m.Value = 5 ; s.Value = 0 ; st.Value = 0425 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 17 then
 		mob.Spawn("Bronze", 14,0.25 ,1,1 , map)
 		mob.Spawn("Glider", 1,2.25 ,3 ,0.8 , map)
 		mob.Spawn("Marksman", 1,0.28 ,1.5,1 , map)
 		mob.Spawn("Merchant", 1,0.28 ,1,1 , map)
 		mob.Spawn("Bread Bearer", 1,1.5 ,1,0.8 , map)
-	elseif wave == 18 then m.Value = 2 ; s.Value = 0 ; st.Value = 0130 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 18 then
 		mob.Spawn("Marksman", 2,3 ,0.8 ,1 , map)
 		mob.Spawn("Glider", 3,2.25 ,0.75 ,1.2 , map)
 		mob.Spawn("Bronze", 3,0.35 ,1,1 , map)
@@ -873,7 +961,7 @@ function round.GetHard(wave, map, spawnMob)
 		mob.Spawn("Marksman", 1,3 ,2 ,1 , map)
 		mob.Spawn("Worker", 20,0.2 ,1,1.25 , map)
 		mob.Spawn("Merchant", 1,0.28 ,0.75,1 , map)
-	elseif wave == 19 then m.Value = 2 ; s.Value = 0 ; st.Value = 0130 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 19 then
 		mob.Spawn("Merchant", 1,0.28 ,0.75,1 , map)
 		mob.Spawn("Bread Bearer", 1,1.5 ,5,0.8 , map)
 		mob.Spawn("Bronze", 3,0.35 ,1,1 , map)
@@ -881,7 +969,7 @@ function round.GetHard(wave, map, spawnMob)
 		mob.Spawn("Bread Bearer", 1,1.5 ,1,0.8 , map)
 		mob.Spawn("Wizard", 2, 5 ,2.5,1 , map)
 		mob.Spawn("Worker", 45,0.1 ,2,2 , map)
-	elseif wave == 20 then m.Value = 6 ; s.Value = 9 ; st.Value = 0001 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 20 then
 		info.Modifiers.NoWaveReward.Value = true
 		mob.Spawn("Marksman", 4,3 ,0.8 ,1 , map)
 		mob.Spawn("Glider", 5,0.6 ,0.5 ,2 , map)
@@ -890,7 +978,7 @@ function round.GetHard(wave, map, spawnMob)
 		mob.Spawn("Wraith", 20,0.28 ,2,1 , map)
 		mob.Spawn("Plague Doctor", 1,4 ,1,0.95 , map)
 		mob.Spawn("Plagued", 15,2 ,1,1 , map)
-	elseif wave == 21 then m.Value = 2 ; s.Value = 30 ; st.Value = 0130 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 21 then
 		mob.Spawn("Plagued", 3,0.5 ,1.5,1 , map)
 		mob.Spawn("Wizard", 1, 1 ,3,1 , map)
 		mob.Spawn("Bronze", 20,0.25 ,1,1.25 , map)
@@ -898,7 +986,7 @@ function round.GetHard(wave, map, spawnMob)
 		mob.Spawn("Wizard", 1, 1 ,3,1 , map)
 		mob.Spawn("Glider", 3,4.5 ,1.5,1 , map)
 		mob.Spawn("Wraith", 50,0.15 ,2,2 , map)
-	elseif wave == 22 then m.Value = 2 ; s.Value = 30 ; st.Value = 0130 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 22 then
 		mob.Spawn("Merchant", 1,0.28 ,1.125,1 , map)
 		mob.Spawn("Wizard", 1, 1 ,5,1 , map)
 		mob.Spawn("Plagued", 2,1 ,1,3 , map)
@@ -906,7 +994,7 @@ function round.GetHard(wave, map, spawnMob)
 		mob.Spawn("Glider", 5,4.5 ,2.5,1 , map)
 		mob.Spawn("Merchant", 1,0.28 ,1.125,1 , map)
 		mob.Spawn("Necromancer", 1,0.5 ,1,1 , map)
-	elseif wave == 23 then m.Value = 4 ; s.Value = 30 ; st.Value = 0130 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 23 then
 		mob.Spawn("Dark Knight", 5,1.2 ,0.45,0.95 , map)
 		mob.Spawn("Marksman", 3,4.5 ,1.75,1 , map)
 		mob.Spawn("Wraith", 15,0.28 ,5,1 , map)
@@ -915,7 +1003,7 @@ function round.GetHard(wave, map, spawnMob)
 		mob.Spawn("Necromancer", 2,0.8 ,1.85,1 , map)
 		mob.Spawn("Marksman", 5,4.5 ,1,1 , map)
 		mob.Spawn("Dark Knight", 1,1.2 ,1.3, 0.85 , map)
-	elseif wave == 24 then m.Value = 2 ; s.Value = 30 ; st.Value = 0130 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 24 then
 		mob.Spawn("Inventor", 1,1.2 ,0.5,1 , map)
 		mob.Spawn("Dark Knight", 2,1 ,0.8,1 , map)
 		mob.Spawn("Necromancer", 1,0.8 ,1.5,1 , map)
@@ -925,7 +1013,7 @@ function round.GetHard(wave, map, spawnMob)
 		mob.Spawn("Glider", 10,0.5 ,1,2.5 , map)
 		mob.Spawn("Dark Knight", 3,1.2 ,1,0.8 , map)
 		mob.Spawn("Dark Knight", 1,1.2 ,1.4,0.8 , map)
-	elseif wave == 25 then m.Value = 2 ; s.Value = 30 ; st.Value = 0130 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 25 then
 		mob.Spawn("Bronze", 10,0.25 ,8,1 , map)
 		mob.Spawn("Dark Knight", 1,1 ,2.75,1 , map)
 		mob.Spawn("Merchant", 3,0.5 ,1,2 , map)
@@ -933,9 +1021,9 @@ function round.GetHard(wave, map, spawnMob)
 		mob.Spawn("Marksman", 3,2.2 ,1.45,1.45 , map)
 		mob.Spawn("Dark Knight", 2,1.5 ,0.5,1 , map)
 		mob.Spawn("Inventor", 1,1.2 ,1,1 , map)
-	elseif wave == 26 then m.Value = 2 ; s.Value = 30 ; st.Value = 0130 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 26 then
 		mob.Spawn("Assassin", 18,0.3 ,1.25,1 , map)
-	elseif wave == 27 then m.Value = 2 ; s.Value = 30 ; st.Value = 0130 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 27 then
 		mob.Spawn("Assassin", 3,0.3 ,2,1 , map)
 		mob.Spawn("Enforcer", 1,0.3 ,1,1 , map)
 		mob.Spawn("Dark Knight", 2,1 ,1,1 , map)
@@ -944,7 +1032,7 @@ function round.GetHard(wave, map, spawnMob)
 		mob.Spawn("Inventor", 1,1 ,2,1, map)
 		mob.Spawn("Plagued", 10,0.5 ,1,1.25 , map)
 		mob.Spawn("Assassin", 2,0.3 ,3,1 , map)
-	elseif wave == 28 then m.Value = 6 ; s.Value = 9 ; st.Value = 0001 ; events.SetTextTime:FireAllClients(m.Value,s.Value)	
+	elseif wave == 28 then
 		mob.Spawn("Inventor", 1,1.2 ,1.2,1 , map)
 		mob.Spawn("Assassin", 10,0.3 ,1,1 , map)
 		mob.Spawn("Necromancer", 5,0.8 ,1.2,1 , map)
@@ -953,19 +1041,19 @@ function round.GetHard(wave, map, spawnMob)
 		mob.Spawn("Honorary", 1,0.5 ,1,1 , map)
 		mob.Spawn("Dark Knight", 4, 0.65 ,0.4,1.5 , map)
 		mob.Spawn("Marksman", 4, 0.5 ,1.5,2 , map)
-	elseif wave == 29 then m.Value = 4 ; s.Value = 30 ; st.Value = 0330 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 29 then
 		mob.Spawn("Whispering Elm", 1,0.25 ,1,1 , map)
 		mob.Spawn("Assassin", 15,0.3 ,1,1.25 , map)
 		mob.Spawn("Enforcer", 2,1.35 ,1,1 , map)
 		mob.Spawn("Wizard", 10, 0.5 ,1,1 , map)
 		mob.Spawn("Inventor", 1,1.2 ,1,1 , map)
 		mob.Spawn("Whispering Elm", 3,1.25 ,1,1.15 , map)
-	elseif wave == 30 then m.Value = 4 ; s.Value = 30 ; st.Value = 0330 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 30 then
 		mob.Spawn("Whispering Elm", 10,1.5 ,0.7,1 , map)
 		mob.Spawn("Inventor", 1,0.3 ,1,1 , map)
 		mob.Spawn("Volent", 4,1 ,1,1 , map)
 		mob.Spawn("Assassin", 25,0.25 ,0.40,2 , map)
-	elseif wave == 31 then m.Value = 4 ; s.Value = 30 ; st.Value = 0330 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 31 then
 		mob.Spawn("Volent", 1,0.25 ,1,1 , map)
 		mob.Spawn("Necromancer", 3,1 ,4,1 , map)
 		mob.Spawn("Enforcer", 1,1 ,1,1 , map)
@@ -977,7 +1065,7 @@ function round.GetHard(wave, map, spawnMob)
 		mob.Spawn("Volent", 1,1 ,0.9,0.9 , map)
 		mob.Spawn("Enforcer", 1,1.2 ,1,1 , map)
 		mob.Spawn("Marksman", 15,1.5 ,2,1 , map)
-	elseif wave == 32 then m.Value = 99 ; s.Value = 59 ; st.Value = 0001 ; events.SetTextTime:FireAllClients(m.Value,s.Value)
+	elseif wave == 32 then
 		ReplicatedStorage.Events.FinalWave:FireAllClients(Color3.new(1, 0, 0))
 		mob.Spawn("Whispering Elm", 4,1 ,0.4,1.5 , map)
 		mob.Spawn("Assassin", 13,0.25 ,1,1 , map)
