@@ -49,9 +49,10 @@ node=function(class,name,parent)
  __newindex=function(self,key,value)
   if key=='Parent' then
    local old=self.Props.Parent
-   if old then for i,c in old.Children do if c==self then table.remove(old.Children,i); break end end; local a=old; while a do a.DescendantRemoving:Fire(self); a=a.Parent end end
+   local common={}; local current=value; while current do common[current]=true; current=current.Parent end
+   if old then for i,c in old.Children do if c==self then table.remove(old.Children,i); break end end; local a=old; while a do if not common[a] then a.DescendantRemoving:Fire(self) end; a=a.Parent end end
    self.Props.Parent=value
-   if value then table.insert(value.Children,self); value.ChildAdded:Fire(self); local a=value; while a do a.DescendantAdded:Fire(self); a=a.Parent end end
+   if value then table.insert(value.Children,self); value.ChildAdded:Fire(self); local a=value; while a do if not old or (old~=a and not old:IsDescendantOf(a)) then a.DescendantAdded:Fire(self) end; a=a.Parent end end
   else
    local old=self.Props[key]; self.Props[key]=value
    if key=='AbsoluteSize' and self.Class=='ScreenGui' then
@@ -144,9 +145,18 @@ local unrelated=node('TextButton','Button',gui); step(0.01); assert(#sent==0,'un
 input.InputEnded:Fire(mouse); assert(#sent==1 and sent[1][1]=='Music' and sent[1][2]==72.2)
 local extra=node('ImageButton','Button',panel); step(0.01)
 assert(math.abs(rows.Music.Track.Size.X.Scale-0.722)<0.001,'rebinding must not multiply the previous fill width')
+local mapRoot=node('Folder','Map',world); local holding=node('Folder','Pending',mapRoot)
+local movedAmbience=node('Sound','Wind',holding); assert(not movedAmbience.SoundGroup)
+movedAmbience.Parent=ambient
+assert(movedAmbience.SoundGroup==background.SoundGroup,'moving an existing sound inside Workspace must assign the ambience channel')
+local nestedAmbient=node('Folder','Ambience',mapRoot); local nestedRain=node('Sound','Rain',nestedAmbient)
+assert(nestedRain.SoundGroup==background.SoundGroup,'map-local ambience folders must route before reparenting too')
 local touch={UserInputType='Touch',Position=v(110,0)}; rows.Ambience.Track.InputBegan:Fire(touch)
 input.InputChanged:Fire({UserInputType='Touch',Position=v(290,0)}); assert(rows.Ambience.Label.Text=='0%','second touch must not hijack the drag')
 input.InputEnded:Fire(touch); assert(sent[2][1]=='Ambience' and sent[2][2]==0 and rows.Ambience.Track.Size.X.Scale==0,'zero volume must empty the fill')
+assert(movedAmbience.SoundGroup.Volume==0 and nestedRain.SoundGroup.Volume==0,'ambience mute must affect moved and map-local sounds')
+movedAmbience.SoundGroup=nil; assert(movedAmbience.SoundGroup and movedAmbience.SoundGroup.Volume==0,'later routing resets must not bypass ambience mute')
+movedAmbience.Parent=music; step(0.01); assert(movedAmbience.SoundGroup==track.SoundGroup,'reparented sounds must switch categories without keeping stale routing')
 local full={UserInputType='Touch',Position=v(290,0)}; rows.Ambience.Bar.InputBegan:Fire(full); input.InputEnded:Fire(full)
 assert(sent[3][2]==100 and rows.Ambience.Track.Size.X.Scale==1,'the whole bar remains interactive after the fill is empty')
 options.VFX.Low.Activated:Fire(); assert(player.VFX.Value=='Low' and emitter.Rate==25 and not emitter.Enabled and not lighting.GlobalShadows)
