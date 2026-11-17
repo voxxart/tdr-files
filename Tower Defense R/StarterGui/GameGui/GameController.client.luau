@@ -28,9 +28,6 @@ local changeModeFunction = functions:WaitForChild("ChangeTowerMode")
 local upgradeTowerFunction = functions:WaitForChild("UpgradeTower")
 local getDataFunction = functions:WaitForChild("GetData")
 local voteSkip = functions:WaitForChild("VoteSkip")
-local SpeedUpCooldown = events:WaitForChild("SpeedupCooldown")
-local speedup1 = functions:WaitForChild("SpeedUp1")
-local speedup2 = functions:WaitForChild("SpeedUp2")
 
 local camera = workspace.CurrentCamera
 local gui = script.Parent
@@ -2545,46 +2542,7 @@ workspace.Info.Modifiers["Generous Farms"].Changed:Connect(function()
 end)
 
 
---GAME SETTINGS--
---Sound Settings--
-gui.Misc.Settings.Button.Activated:Connect(function()
-	gui.FullSettings.Visible = not gui.FullSettings.Visible
-end)
-
-gui.FullSettings.Buttons.Timescale.Open.Activated:Connect(function()
-	local data = getDataFunction:InvokeServer() -- no player param
-
-	local unlocked = tonumber(data and data.UnlockedTimescale) or 0
-	local isUnlocked = unlocked >= 1
-
-	print(unlocked)
-
-	if isUnlocked then
-		gui.FullSettings.SettingsArea.Timescale.Visible = true
-		gui.FullSettings.SettingsArea.Gen.Visible = true
-		gui.FullSettings.SettingsArea.General.Visible = false
-		gui.FullSettings.SettingsArea.Sound.Visible = false
-	else
-		events.NotifcationSend:FireServer()
-		gui.FullSettings.SettingsArea.Timescale.Visible = false
-		gui.FullSettings.SettingsArea.Gen.Visible = false
-	end
-end)
--- Close button
-gui.FullSettings.Buttons.General.Open.Activated:Connect(function()
-	gui.FullSettings.SettingsArea.General.Visible = true
-	gui.FullSettings.SettingsArea.Timescale.Visible = false
-	gui.FullSettings.SettingsArea.Sound.Visible = false
-	gui.FullSettings.SettingsArea.Gen.Visible = false
-end)
-
-gui.FullSettings.Buttons.Sound.Open.Activated:Connect(function()
-	gui.FullSettings.SettingsArea.General.Visible = false
-	gui.FullSettings.SettingsArea.Timescale.Visible = false
-	gui.FullSettings.SettingsArea.Sound.Visible = true
-	gui.FullSettings.SettingsArea.Gen.Visible = false
-end)
---END OF GAME SETTINGS--
+-- Settings UI is owned by SettingsController.
 local template = gui:WaitForChild("Cash") -- your original "Cash" frame
 
 local tweenInfoIn = TweenInfo.new(
@@ -3517,89 +3475,7 @@ gui.SkipFrame.ButtonArea.Pass.Button.Activated:Connect(function()
 end)
 workspace.Info.VoteSkipValue.Changed:Connect(updateSkipCard)
 
-SpeedUpCooldown.OnClientEvent:Connect(function()
-	gui.FullSettings.SettingsArea.Timescale.Default.Button.Interactable = false
-	gui.FullSettings.SettingsArea.Timescale.SpeedUp.Button.Interactable = false
-
-	local label = gui.FullSettings.SettingsArea.Gen.Title
-	local TIMER_BINDING_NAME = "Timer"
-
-	local function StartTimer(duration)
-		local delayEvent = Instance.new("BindableEvent")
-		local endTime = tick() + duration
-		local lastSecondShown = nil
-
-		RunService:BindToRenderStep(TIMER_BINDING_NAME, Enum.RenderPriority.Last.Value - 1, function()
-			local timeLeft = endTime - tick()
-			local seconds = math.ceil(timeLeft)
-
-			-- Only update the label when seconds change
-			if seconds ~= lastSecondShown and seconds > 0 then
-				lastSecondShown = seconds
-				label.Text = string.format("Timescale Cooldown: %d", seconds)
-			end
-
-			if timeLeft <= 0 then
-				label.Text = "Timescale Ready"
-				RunService:UnbindFromRenderStep(TIMER_BINDING_NAME)
-
-				gui.FullSettings.SettingsArea.Timescale.Default.Button.Interactable = true
-				gui.FullSettings.SettingsArea.Timescale.SpeedUp.Button.Interactable = true
-
-				delayEvent:Fire()
-			end
-		end)
-
-		delayEvent.Event:Wait()
-	end
-
-	StartTimer(120)
-end)
-
---[[if info.PlrValue.Value >= 2 then
-	gui.TimescaleSettings.SettingsMenu.Timescale.Base.Icon.Visible = true
-	gui.TimescaleSettings.SettingsMenu.Timescale.Speed.Icon.Visible = true
-	gui.TimescaleSettings.SettingsMenu.Timescale.Base.Upgrade.Interactable = false
-	gui.TimescaleSettings.SettingsMenu.Timescale.Speed.Upgrade.Interactable = false
-else
-	gui.TimescaleSettings.SettingsMenu.Timescale.Base.Icon.Visible = false
-	gui.TimescaleSettings.SettingsMenu.Timescale.Speed.Icon.Visible = false
-	gui.TimescaleSettings.SettingsMenu.Timescale.Base.Upgrade.Interactable = true
-	gui.TimescaleSettings.SettingsMenu.Timescale.Speed.Upgrade.Interactable = true
-end]]--
-
-
-gui.FullSettings.SettingsArea.Timescale.Default.Button.Activated:Connect(function()
-	print("1x speed pressed")
-	gui.FullSettings.SettingsArea.Timescale.Default.Button.Interactable = false
-	gui.FullSettings.SettingsArea.Timescale.SpeedUp.Button.Interactable = false
-	local speedUpFunction = ReplicatedStorage.Functions.SpeedUp1
-	speedUpFunction:InvokeServer()
-end)
-
-gui.FullSettings.SettingsArea.Timescale.SpeedUp.Button.Activated:Connect(function()
-	print("2x speed pressed")
-	gui.FullSettings.SettingsArea.Timescale.Default.Button.Interactable = false
-	gui.FullSettings.SettingsArea.Timescale.SpeedUp.Button.Interactable = false
-	local speedUpFunction = ReplicatedStorage.Functions.SpeedUp2
-	speedUpFunction:InvokeServer()
-end)
-
 workspace.Info.GameSpeed.Changed:Connect(function(change)
-	gui.FullSettings.SettingsArea.Gen.Cooldown.Text = "Current Gamespeed: (" .. workspace.Info.GameSpeed.Value .. ")"
-
-	if change == 1.5 then
-		gui.FullSettings.SettingsArea.Timescale.Default.Button.UIStroke.Disabled.Enabled = true
-		gui.FullSettings.SettingsArea.Timescale.Default.Button.UIStroke.EnabledVFX.Enabled = false
-		gui.FullSettings.SettingsArea.Timescale.SpeedUp.Button.UIStroke.Disabled.Enabled = false
-		gui.FullSettings.SettingsArea.Timescale.SpeedUp.Button.UIStroke.EnabledVFX.Enabled = true
-	elseif change == 1 then
-		gui.FullSettings.SettingsArea.Timescale.Default.Button.UIStroke.Disabled.Enabled = false
-		gui.FullSettings.SettingsArea.Timescale.Default.Button.UIStroke.EnabledVFX.Enabled = true
-		gui.FullSettings.SettingsArea.Timescale.SpeedUp.Button.UIStroke.Disabled.Enabled = true
-		gui.FullSettings.SettingsArea.Timescale.SpeedUp.Button.UIStroke.EnabledVFX.Enabled = false
-	else
-	end
 	local msg = gui.Messages.Message:Clone()
 	msg.Visible = true
 	msg.Parent = gui.Messages

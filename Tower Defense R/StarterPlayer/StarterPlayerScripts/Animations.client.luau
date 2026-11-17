@@ -14,6 +14,8 @@ local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local ContentProvider = game:GetService("ContentProvider")
 
+local emitVFX=require(ReplicatedStorage.GameModules:WaitForChild("VFXPolicy")).Emit
+
 -- Refs
 local Particle = ReplicatedStorage:WaitForChild("Particle")
 local events = ReplicatedStorage:WaitForChild("Events")
@@ -168,10 +170,10 @@ local function Explode(Target: BasePart, Radius: number)
 			local fire = att:FindFirstChild("Fire")
 			local smoke = att:FindFirstChild("Smoke")
 			local streaks = att:FindFirstChild("Streaks")
-			if emb then emb:Emit(25) end
-			if fire then fire:Emit(25) end
-			if smoke then smoke:Emit(25) end
-			if streaks then streaks:Emit(25) end
+			if emb then emitVFX(emb,25) end
+			if fire then emitVFX(fire,25) end
+			if smoke then emitVFX(smoke,25) end
+			if streaks then emitVFX(streaks,25) end
 		end
 	else
 		-- keep print (original behavior)
@@ -233,10 +235,10 @@ local function DemoExplode(Target: BasePart, Radius: number)
 			local fire = att:FindFirstChild("Fire")
 			local smoke = att:FindFirstChild("Smoke")
 			local streaks = att:FindFirstChild("Streaks")
-			if emb then emb:Emit(10) end
-			if fire then fire:Emit(10) end
-			if smoke then smoke:Emit(10) end
-			if streaks then streaks:Emit(10) end
+			if emb then emitVFX(emb,10) end
+			if fire then emitVFX(fire,10) end
+			if smoke then emitVFX(smoke,10) end
+			if streaks then emitVFX(streaks,10) end
 		end
 	else
 		-- keep print (original behavior)
@@ -278,7 +280,7 @@ local function HeliExplode(Target: BasePart, Radius: number)
 	if isHighVFX() then
 		local att = NewExplode.Inner:FindFirstChild("Attachment")
 		local streaks = att and att:FindFirstChild("Streaks")
-		if streaks then streaks:Emit(25) end
+		if streaks then emitVFX(streaks,25) end
 	else
 		print("Low VFX Are Active")
 	end
@@ -1741,13 +1743,13 @@ local function MuzzleFlash(tower)
 	local barrel = handle:FindFirstChild("Barrel")
 
 	if not barrel then
-		local s = start:FindFirstChild("Spark"); if s then s:Emit(1) end
-		local sm = start:FindFirstChild("Smoke"); if sm then sm:Emit(1) end
-		local f = start:FindFirstChild("flash1"); if f then f:Emit(1) end
+		local s = start:FindFirstChild("Spark"); if s then emitVFX(s,1) end
+		local sm = start:FindFirstChild("Smoke"); if sm then emitVFX(sm,1) end
+		local f = start:FindFirstChild("flash1"); if f then emitVFX(f,1) end
 	else
-		local tvfx = start:FindFirstChild("TestVFX"); if tvfx then tvfx:Emit(1) end
-		local sm = barrel:FindFirstChild("Smoke"); if sm then sm:Emit(3) end
-		local sm = barrel:FindFirstChild("Spark"); if sm then sm:Emit(3) end
+		local tvfx = start:FindFirstChild("TestVFX"); if tvfx then emitVFX(tvfx,1) end
+		local sm = barrel:FindFirstChild("Smoke"); if sm then emitVFX(sm,3) end
+		local sm = barrel:FindFirstChild("Spark"); if sm then emitVFX(sm,3) end
 	end
 end
 
@@ -1769,13 +1771,13 @@ local function MuzzleFlashUnitTurret(unit)
 	local barrel = handle:FindFirstChild("Barrel")
 
 	if not barrel then
-		local s = start:FindFirstChild("Spark"); if s then s:Emit(1) end
-		local sm = start:FindFirstChild("Smoke"); if sm then sm:Emit(1) end
-		local f = start:FindFirstChild("flash1"); if f then f:Emit(1) end
+		local s = start:FindFirstChild("Spark"); if s then emitVFX(s,1) end
+		local sm = start:FindFirstChild("Smoke"); if sm then emitVFX(sm,1) end
+		local f = start:FindFirstChild("flash1"); if f then emitVFX(f,1) end
 	else
-		local tvfx = start:FindFirstChild("TestVFX"); if tvfx then tvfx:Emit(1) end
-		local sm = barrel:FindFirstChild("Smoke"); if sm then sm:Emit(3) end
-		local sm = barrel:FindFirstChild("Spark"); if sm then sm:Emit(3) end
+		local tvfx = start:FindFirstChild("TestVFX"); if tvfx then emitVFX(tvfx,1) end
+		local sm = barrel:FindFirstChild("Smoke"); if sm then emitVFX(sm,3) end
+		local sm = barrel:FindFirstChild("Spark"); if sm then emitVFX(sm,3) end
 	end
 end
 
@@ -1797,13 +1799,13 @@ local function MuzzleFlashUnitCanon(unit)
 	local barrel = handle:FindFirstChild("Barrel")
 
 	if not barrel then
-		local s = start:FindFirstChild("Spark"); if s then s:Emit(5) end
-		local sm = start:FindFirstChild("Smoke"); if sm then sm:Emit(5) end
-		local f = start:FindFirstChild("flash1"); if f then f:Emit(5) end
+		local s = start:FindFirstChild("Spark"); if s then emitVFX(s,5) end
+		local sm = start:FindFirstChild("Smoke"); if sm then emitVFX(sm,5) end
+		local f = start:FindFirstChild("flash1"); if f then emitVFX(f,5) end
 	else
-		local tvfx = start:FindFirstChild("TestVFX"); if tvfx then tvfx:Emit(1) end
-		local sm = barrel:FindFirstChild("Smoke"); if sm then sm:Emit(3) end
-		local sm = barrel:FindFirstChild("Spark"); if sm then sm:Emit(3) end
+		local tvfx = start:FindFirstChild("TestVFX"); if tvfx then emitVFX(tvfx,1) end
+		local sm = barrel:FindFirstChild("Smoke"); if sm then emitVFX(sm,3) end
+		local sm = barrel:FindFirstChild("Spark"); if sm then emitVFX(sm,3) end
 	end
 end
 
@@ -1825,13 +1827,13 @@ local function MuzzleFlashUnitCannon(unit)
 	local barrel = handle:FindFirstChild("Barrel")
 
 	if not barrel then
-		local s = start:FindFirstChild("Spark"); if s then s:Emit(1) end
-		local sm = start:FindFirstChild("Smoke"); if sm then sm:Emit(1) end
-		local f = start:FindFirstChild("flash1"); if f then f:Emit(1) end
+		local s = start:FindFirstChild("Spark"); if s then emitVFX(s,1) end
+		local sm = start:FindFirstChild("Smoke"); if sm then emitVFX(sm,1) end
+		local f = start:FindFirstChild("flash1"); if f then emitVFX(f,1) end
 	else
-		local tvfx = start:FindFirstChild("TestVFX"); if tvfx then tvfx:Emit(1) end
-		local sm = barrel:FindFirstChild("Smoke"); if sm then sm:Emit(3) end
-		local sm = barrel:FindFirstChild("Spark"); if sm then sm:Emit(3) end
+		local tvfx = start:FindFirstChild("TestVFX"); if tvfx then emitVFX(tvfx,1) end
+		local sm = barrel:FindFirstChild("Smoke"); if sm then emitVFX(sm,3) end
+		local sm = barrel:FindFirstChild("Spark"); if sm then emitVFX(sm,3) end
 	end
 end
 
@@ -1863,45 +1865,45 @@ local function AviatorMuzzleFlash(tower)
 
 		-- Handle 1
 		if s1 and not barrel1 then
-			local a = s1:FindFirstChild("Spark"); if a then a:Emit(1) end
-			local b = s1:FindFirstChild("Smoke"); if b then b:Emit(1) end
-			local c = s1:FindFirstChild("flash1"); if c then c:Emit(1) end
+			local a = s1:FindFirstChild("Spark"); if a then emitVFX(a,1) end
+			local b = s1:FindFirstChild("Smoke"); if b then emitVFX(b,1) end
+			local c = s1:FindFirstChild("flash1"); if c then emitVFX(c,1) end
 		elseif s1 and barrel1 then
-			local a = barrel1:FindFirstChild("Smoke"); if a then a:Emit(1) end
-			local b = s1:FindFirstChild("TestVFX"); if b then b:Emit(1) end
-			local sm = barrel1:FindFirstChild("Spark"); if sm then sm:Emit(3) end
+			local a = barrel1:FindFirstChild("Smoke"); if a then emitVFX(a,1) end
+			local b = s1:FindFirstChild("TestVFX"); if b then emitVFX(b,1) end
+			local sm = barrel1:FindFirstChild("Spark"); if sm then emitVFX(sm,3) end
 		end
 
 		-- Handle 2
 		if s2 and not barrel2 then
-			local a = s2:FindFirstChild("Spark"); if a then a:Emit(1) end
-			local b = s2:FindFirstChild("Smoke"); if b then b:Emit(1) end
-			local c = s2:FindFirstChild("flash1"); if c then c:Emit(1) end
+			local a = s2:FindFirstChild("Spark"); if a then emitVFX(a,1) end
+			local b = s2:FindFirstChild("Smoke"); if b then emitVFX(b,1) end
+			local c = s2:FindFirstChild("flash1"); if c then emitVFX(c,1) end
 		elseif s2 and barrel2 then
-			local a = barrel2:FindFirstChild("Smoke"); if a then a:Emit(1) end
-			local b = s2:FindFirstChild("TestVFX"); if b then b:Emit(1) end
-			local sm = barrel2:FindFirstChild("Spark"); if sm then sm:Emit(3) end
+			local a = barrel2:FindFirstChild("Smoke"); if a then emitVFX(a,1) end
+			local b = s2:FindFirstChild("TestVFX"); if b then emitVFX(b,1) end
+			local sm = barrel2:FindFirstChild("Spark"); if sm then emitVFX(sm,3) end
 		end
 
 		if s3 and not barrel3 then
-			local a = s3:FindFirstChild("Spark"); if a then a:Emit(1) end
-			local b = s3:FindFirstChild("Smoke"); if b then b:Emit(1) end
-			local c = s3:FindFirstChild("flash1"); if c then c:Emit(1) end
+			local a = s3:FindFirstChild("Spark"); if a then emitVFX(a,1) end
+			local b = s3:FindFirstChild("Smoke"); if b then emitVFX(b,1) end
+			local c = s3:FindFirstChild("flash1"); if c then emitVFX(c,1) end
 		elseif s3 and barrel3 then
-			local a = barrel3:FindFirstChild("Smoke"); if a then a:Emit(1) end
-			local b = s3:FindFirstChild("TestVFX"); if b then b:Emit(1) end
-			local sm = barrel3:FindFirstChild("Spark"); if sm then sm:Emit(3) end
+			local a = barrel3:FindFirstChild("Smoke"); if a then emitVFX(a,1) end
+			local b = s3:FindFirstChild("TestVFX"); if b then emitVFX(b,1) end
+			local sm = barrel3:FindFirstChild("Spark"); if sm then emitVFX(sm,3) end
 		end
 
 		-- Handle 2
 		if s4 and not barrel4 then
-			local a = s4:FindFirstChild("Spark"); if a then a:Emit(1) end
-			local b = s4:FindFirstChild("Smoke"); if b then b:Emit(1) end
-			local c = s4:FindFirstChild("flash1"); if c then c:Emit(1) end
+			local a = s4:FindFirstChild("Spark"); if a then emitVFX(a,1) end
+			local b = s4:FindFirstChild("Smoke"); if b then emitVFX(b,1) end
+			local c = s4:FindFirstChild("flash1"); if c then emitVFX(c,1) end
 		elseif s4 and barrel4 then
-			local a = barrel4:FindFirstChild("Smoke"); if a then a:Emit(1) end
-			local b = s4:FindFirstChild("TestVFX"); if b then b:Emit(1) end
-			local sm = barrel4:FindFirstChild("Spark"); if sm then sm:Emit(3) end
+			local a = barrel4:FindFirstChild("Smoke"); if a then emitVFX(a,1) end
+			local b = s4:FindFirstChild("TestVFX"); if b then emitVFX(b,1) end
+			local sm = barrel4:FindFirstChild("Spark"); if sm then emitVFX(sm,3) end
 		end
 	else
 		local handle1 = weapon:FindFirstChild("Handle")
@@ -1916,24 +1918,24 @@ local function AviatorMuzzleFlash(tower)
 
 		-- Handle 1
 		if s1 and not barrel1 then
-			local a = s1:FindFirstChild("Spark"); if a then a:Emit(1) end
-			local b = s1:FindFirstChild("Smoke"); if b then b:Emit(1) end
-			local c = s1:FindFirstChild("flash1"); if c then c:Emit(1) end
+			local a = s1:FindFirstChild("Spark"); if a then emitVFX(a,1) end
+			local b = s1:FindFirstChild("Smoke"); if b then emitVFX(b,1) end
+			local c = s1:FindFirstChild("flash1"); if c then emitVFX(c,1) end
 		elseif s1 and barrel1 then
-			local a = barrel1:FindFirstChild("Smoke"); if a then a:Emit(1) end
-			local b = s1:FindFirstChild("TestVFX"); if b then b:Emit(1) end
-			local sm = barrel1:FindFirstChild("Spark"); if sm then sm:Emit(3) end
+			local a = barrel1:FindFirstChild("Smoke"); if a then emitVFX(a,1) end
+			local b = s1:FindFirstChild("TestVFX"); if b then emitVFX(b,1) end
+			local sm = barrel1:FindFirstChild("Spark"); if sm then emitVFX(sm,3) end
 		end
 
 		-- Handle 2
 		if s2 and not barrel2 then
-			local a = s2:FindFirstChild("Spark"); if a then a:Emit(1) end
-			local b = s2:FindFirstChild("Smoke"); if b then b:Emit(1) end
-			local c = s2:FindFirstChild("flash1"); if c then c:Emit(1) end
+			local a = s2:FindFirstChild("Spark"); if a then emitVFX(a,1) end
+			local b = s2:FindFirstChild("Smoke"); if b then emitVFX(b,1) end
+			local c = s2:FindFirstChild("flash1"); if c then emitVFX(c,1) end
 		elseif s2 and barrel2 then
-			local a = barrel2:FindFirstChild("Smoke"); if a then a:Emit(1) end
-			local b = s2:FindFirstChild("TestVFX"); if b then b:Emit(1) end
-			local sm = barrel2:FindFirstChild("Spark"); if sm then sm:Emit(3) end
+			local a = barrel2:FindFirstChild("Smoke"); if a then emitVFX(a,1) end
+			local b = s2:FindFirstChild("TestVFX"); if b then emitVFX(b,1) end
+			local sm = barrel2:FindFirstChild("Spark"); if sm then emitVFX(sm,3) end
 		end
 	end
 end
@@ -1961,24 +1963,24 @@ local function DualMuzzleFlash(tower)
 
 	-- Handle 1
 	if s1 and not barrel1 then
-		local a = s1:FindFirstChild("Spark"); if a then a:Emit(1) end
-		local b = s1:FindFirstChild("Smoke"); if b then b:Emit(1) end
-		local c = s1:FindFirstChild("flash1"); if c then c:Emit(1) end
+		local a = s1:FindFirstChild("Spark"); if a then emitVFX(a,1) end
+		local b = s1:FindFirstChild("Smoke"); if b then emitVFX(b,1) end
+		local c = s1:FindFirstChild("flash1"); if c then emitVFX(c,1) end
 	elseif s1 and barrel1 then
-		local a = barrel1:FindFirstChild("Smoke"); if a then a:Emit(1) end
-		local b = s1:FindFirstChild("TestVFX"); if b then b:Emit(1) end
-		local sm = barrel1:FindFirstChild("Spark"); if sm then sm:Emit(3) end
+		local a = barrel1:FindFirstChild("Smoke"); if a then emitVFX(a,1) end
+		local b = s1:FindFirstChild("TestVFX"); if b then emitVFX(b,1) end
+		local sm = barrel1:FindFirstChild("Spark"); if sm then emitVFX(sm,3) end
 	end
 
 	-- Handle 2
 	if s2 and not barrel2 then
-		local a = s2:FindFirstChild("Spark"); if a then a:Emit(1) end
-		local b = s2:FindFirstChild("Smoke"); if b then b:Emit(1) end
-		local c = s2:FindFirstChild("flash1"); if c then c:Emit(1) end
+		local a = s2:FindFirstChild("Spark"); if a then emitVFX(a,1) end
+		local b = s2:FindFirstChild("Smoke"); if b then emitVFX(b,1) end
+		local c = s2:FindFirstChild("flash1"); if c then emitVFX(c,1) end
 	elseif s2 and barrel2 then
-		local a = barrel2:FindFirstChild("Smoke"); if a then a:Emit(1) end
-		local b = s2:FindFirstChild("TestVFX"); if b then b:Emit(1) end
-		local sm = barrel2:FindFirstChild("Spark"); if sm then sm:Emit(3) end
+		local a = barrel2:FindFirstChild("Smoke"); if a then emitVFX(a,1) end
+		local b = s2:FindFirstChild("TestVFX"); if b then emitVFX(b,1) end
+		local sm = barrel2:FindFirstChild("Spark"); if sm then emitVFX(sm,3) end
 	end
 end
 
@@ -2004,24 +2006,24 @@ local function DualWeaponMuzzleFlash(tower)
 
 	-- Handle 1
 	if s1 and not barrel1 then
-		local a = s1:FindFirstChild("Spark"); if a then a:Emit(1) end
-		local b = s1:FindFirstChild("Smoke"); if b then b:Emit(1) end
-		local c = s1:FindFirstChild("flash1"); if c then c:Emit(1) end
+		local a = s1:FindFirstChild("Spark"); if a then emitVFX(a,1) end
+		local b = s1:FindFirstChild("Smoke"); if b then emitVFX(b,1) end
+		local c = s1:FindFirstChild("flash1"); if c then emitVFX(c,1) end
 	elseif s1 and barrel1 then
-		local a = barrel1:FindFirstChild("Smoke"); if a then a:Emit(1) end
-		local b = s1:FindFirstChild("TestVFX"); if b then b:Emit(1) end
-		local sm = barrel1:FindFirstChild("Spark"); if sm then sm:Emit(3) end
+		local a = barrel1:FindFirstChild("Smoke"); if a then emitVFX(a,1) end
+		local b = s1:FindFirstChild("TestVFX"); if b then emitVFX(b,1) end
+		local sm = barrel1:FindFirstChild("Spark"); if sm then emitVFX(sm,3) end
 	end
 
 	-- Handle 2
 	if s2 and not barrel2 then
-		local a = s2:FindFirstChild("Spark"); if a then a:Emit(1) end
-		local b = s2:FindFirstChild("Smoke"); if b then b:Emit(1) end
-		local c = s2:FindFirstChild("flash1"); if c then c:Emit(1) end
+		local a = s2:FindFirstChild("Spark"); if a then emitVFX(a,1) end
+		local b = s2:FindFirstChild("Smoke"); if b then emitVFX(b,1) end
+		local c = s2:FindFirstChild("flash1"); if c then emitVFX(c,1) end
 	elseif s2 and barrel2 then
-		local a = barrel2:FindFirstChild("Smoke"); if a then a:Emit(1) end
-		local b = s2:FindFirstChild("TestVFX"); if b then b:Emit(1) end
-		local sm = barrel2:FindFirstChild("Spark"); if sm then sm:Emit(3) end
+		local a = barrel2:FindFirstChild("Smoke"); if a then emitVFX(a,1) end
+		local b = s2:FindFirstChild("TestVFX"); if b then emitVFX(b,1) end
+		local sm = barrel2:FindFirstChild("Spark"); if sm then emitVFX(sm,3) end
 	end
 end
 
@@ -2076,14 +2078,14 @@ local function DualUnitMuzzleFlash(tower)
 	local s1 = b1 and b1:FindFirstChild("Start")
 	local s2 = b2 and b2:FindFirstChild("Start")
 	if s1 then
-		local a = s1:FindFirstChild("Spark"); if a then a:Emit(1) end
-		local b = s1:FindFirstChild("Smoke"); if b then b:Emit(1) end
-		local c = s1:FindFirstChild("flash1"); if c then c:Emit(1) end
+		local a = s1:FindFirstChild("Spark"); if a then emitVFX(a,1) end
+		local b = s1:FindFirstChild("Smoke"); if b then emitVFX(b,1) end
+		local c = s1:FindFirstChild("flash1"); if c then emitVFX(c,1) end
 	end
 	if s2 then
-		local a = s2:FindFirstChild("Spark"); if a then a:Emit(1) end
-		local b = s2:FindFirstChild("Smoke"); if b then b:Emit(1) end
-		local c = s2:FindFirstChild("flash1"); if c then c:Emit(1) end
+		local a = s2:FindFirstChild("Spark"); if a then emitVFX(a,1) end
+		local b = s2:FindFirstChild("Smoke"); if b then emitVFX(b,1) end
+		local c = s2:FindFirstChild("flash1"); if c then emitVFX(c,1) end
 	end
 end
 
@@ -2096,11 +2098,11 @@ local function WMRocketMuzzleFlash(tower)
 	if not h1 or not Attachment then return end
 
 	local Smoke = Attachment:FindFirstChild("Smoke")
-	if Smoke then Smoke:Emit(7) end
+	if Smoke then emitVFX(Smoke,7) end
 	local Spark = Attachment:FindFirstChild("Spark")
-	if Spark then Spark:Emit(7) end
+	if Spark then emitVFX(Spark,7) end
 	local Flash = Attachment:FindFirstChild("flash1")
-	if Flash then Flash:Emit(7) end
+	if Flash then emitVFX(Flash,7) end
 end
 
 local function WarmachineMuzzleFlash(tower)
@@ -2119,14 +2121,14 @@ local function WarmachineMuzzleFlash(tower)
 	if not start1 or not barrel1 or not start2 or not barrel2 then return end
 
 	local fx1 = start1:FindFirstChild("TestVFX")
-	if fx1 then fx1:Emit(1) end
+	if fx1 then emitVFX(fx1,1) end
 	local smoke1 = barrel1:FindFirstChild("Smoke")
-	if smoke1 then smoke1:Emit(1) end
+	if smoke1 then emitVFX(smoke1,1) end
 
 	local fx2 = start2:FindFirstChild("TestVFX")
-	if fx2 then fx2:Emit(1) end
+	if fx2 then emitVFX(fx2,1) end
 	local smoke2 = barrel2:FindFirstChild("Smoke")
-	if smoke2 then smoke2:Emit(1) end
+	if smoke2 then emitVFX(smoke2,1) end
 end
 
 local function PhaserMuzzleFlash(tower)
@@ -2137,7 +2139,7 @@ local function PhaserMuzzleFlash(tower)
 
 	for _, n in ipairs({"Spark","Core","Glow","Rays1","Rays2","Smoke"}) do
 		local p = start:FindFirstChild(n)
-		if p then p:Emit(1) end
+		if p then emitVFX(p,1) end
 	end
 end
 
@@ -3640,9 +3642,9 @@ events:WaitForChild("AnimateEnemy").OnClientEvent:Connect(function(tower, animNa
 	local handle = weapon and weapon:FindFirstChild("Handle")
 	local start = handle and handle:FindFirstChild("Start")
 	if start then
-		local sm = start:FindFirstChild("Smoke"); if sm then sm:Emit(1) end
-		local sp = start:FindFirstChild("Spark"); if sp then sp:Emit(1) end
-		local fl = start:FindFirstChild("flash1"); if fl then fl:Emit(1) end
+		local sm = start:FindFirstChild("Smoke"); if sm then emitVFX(sm,1) end
+		local sp = start:FindFirstChild("Spark"); if sp then emitVFX(sp,1) end
+		local fl = start:FindFirstChild("flash1"); if fl then emitVFX(fl,1) end
 	end
 
 	local hrp = tower:FindFirstChild("HumanoidRootPart")

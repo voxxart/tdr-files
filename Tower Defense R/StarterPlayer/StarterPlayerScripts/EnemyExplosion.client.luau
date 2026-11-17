@@ -3,6 +3,7 @@
 
 local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local emitVFX=require(ReplicatedStorage.GameModules:WaitForChild("VFXPolicy")).Emit
 local TweenService = game:GetService("TweenService")
 
 local Events = ReplicatedStorage:WaitForChild("Events")
@@ -53,7 +54,7 @@ EnemyExplosion.OnClientEvent:Connect(function(position, radius)
 			local emitter = attachment:FindFirstChild(name)
 
 			if emitter then
-				emitter:Emit(25)
+				emitVFX(emitter,25)
 			end
 		end
 	end

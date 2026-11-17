@@ -50,7 +50,7 @@ local function node(class,name)
  return n
 end
 local function add(parent,class,name) local n=node(class,name); n.Parent=parent; return n end
-local rep=node('Folder'); rep.Orbs='orbs'; local gm=add(rep,'Folder','GameModules'); gm.EventCurrencyConfig='config'; gm.EventCurrencyAssets='assets'; gm.EventCurrencyPool='pool'; gm.Orbs='orbs'
+local rep=node('Folder'); rep.Orbs='orbs'; local gm=add(rep,'Folder','GameModules'); gm.EventCurrencyConfig='config'; gm.VFXPolicy='vfx'; gm.EventCurrencyAssets='assets'; gm.EventCurrencyPool='pool'; gm.Orbs='orbs'
 local events=add(rep,'Folder','Events'); local remote=add(events,'RemoteEvent','EventCurrency'); remote.OnClientEvent=signal()
 local snapshot=add(events,'RemoteFunction','EventCurrencySnapshot')
 local particle=add(rep,'Folder','Particle'); local folder=add(particle,'Folder','EventCurrency'); local asset=add(folder,'Model','Current'); add(asset,'Part','Coin'); add(asset,'Script','UnwantedScript'); add(asset,'Sound','PickupSound')
@@ -62,7 +62,7 @@ local render=signal(); local destroy=signal(); local wall=0
 local function step(dt) wall+=dt; render:Fire(dt) end
 local config={Enabled=true,MaxClientVisuals=6,ClientBuildsPerFrame=2,MaxCollectionBurstsPerFrame=1,CollectionOrbs=1,PickupDisplaySeconds=5,LaunchDuration=0.5,ArcHeight=5,BounceDuration=0.9,BounceHeight=1,CollectionDuration=0.4}
 local orbCalls={}
-local loaded={config=config,orbs={Play=function(...) table.insert(orbCalls,table.pack(...)) end}}
+local loaded={config=config,vfx={Emit=function(emitter,count) emitter:Emit(count) end},orbs={Play=function(...) table.insert(orbCalls,table.pack(...)) end}}
 local moved,batches=0,0
 function world:BulkMoveTo(parts,frames) batches+=1; moved+=#parts; for i,part in parts do part.CFrame=frames[i]; part.Position=frames[i].Position end end
 local function spawn(id,recipients)

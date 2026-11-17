@@ -2,6 +2,7 @@ local Rep=game:GetService('ReplicatedStorage')
 local RunService=game:GetService('RunService')
 local Players=game:GetService('Players')
 local Config=require(Rep.GameModules.EventCurrencyConfig)
+local emitVFX=require(Rep.GameModules.VFXPolicy).Emit
 local Assets=require(Rep.GameModules.EventCurrencyAssets)
 local Pool=require(Rep.GameModules.EventCurrencyPool)
 -- Farm installations commonly place Orbs directly under ReplicatedStorage.
@@ -57,7 +58,7 @@ local function emitBurst(root,asset)
    emitter.Parent=burstAttachment; table.insert(burstEmitters,emitter)
   end
  end
- for _,emitter in burstEmitters do emitter:Emit(math.clamp(Config.PickupBurstCount or 14,0,32)) end
+ for _,emitter in burstEmitters do emitVFX(emitter,math.clamp(Config.PickupBurstCount or 14,0,32)) end
  lastBurst=os.clock()
 end
 local function running() return info.GameRunning.Value and info.Message.Value~='VICTORY' and info.Message.Value~='GAME OVER' end
