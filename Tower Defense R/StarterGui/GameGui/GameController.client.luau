@@ -1811,7 +1811,7 @@ local function toggleTowerInfo()
 				then
 					updateUpgradeLevelDisplay(selectedForLevelUI)
 					updateOwnerBoxColor(selectedForLevelUI)
-						refreshAdvancedStats(selectedForLevelUI)
+					refreshAdvancedStats(selectedForLevelUI)
 				end
 			end)
 
@@ -2547,7 +2547,7 @@ end)
 
 --GAME SETTINGS--
 --Sound Settings--
-gui.Settings.OpenSettings.Button.Activated:Connect(function()
+gui.Misc.Settings.Button.Activated:Connect(function()
 	gui.FullSettings.Visible = not gui.FullSettings.Visible
 end)
 
@@ -2761,13 +2761,13 @@ local TextChatService = game:GetService("TextChatService")
 
 local skipChoiceWave
 local function updateSkipCard()
- local wave=info.Wave.Value
- local open=info:GetAttribute("SkipOpen")==true and info.GameRunning.Value and skipChoiceWave~=wave
- gui.SkipFrame.Visible=open
- gui.SkipFrame.UpgradeArea.ButtonArea.Skip.Visible=open
- gui.SkipFrame.UpgradeArea.ButtonArea.Pass.Visible=open
- local required=info:GetAttribute("SkipRequired") or math.max(1,workspace.Info.PlrValue.Value-1)
- gui.SkipFrame.Title.Text="Skip Wave? ("..info.VoteSkipValue.Value.."/"..required..")"
+	local wave=info.Wave.Value
+	local open=info:GetAttribute("SkipOpen")==true and info.GameRunning.Value and skipChoiceWave~=wave
+	gui.SkipFrame.Visible=open
+	gui.SkipFrame.ButtonArea.Skip.Visible=open
+	gui.SkipFrame.ButtonArea.Pass.Visible=open
+	local required=info:GetAttribute("SkipRequired") or math.max(1,workspace.Info.PlrValue.Value-1)
+	gui.SkipFrame.Title.Text="Skip Wave? ("..info.VoteSkipValue.Value.."/"..required..")"
 end
 skipButon.OnClientEvent:Connect(updateSkipCard)
 events.SkipWaveHide.OnClientEvent:Connect(updateSkipCard)
@@ -3487,33 +3487,33 @@ end)
 
 --FINISH COMMANDER LOGIC--
 
-local originalSize = gui.SkipFrame.UpgradeArea.ButtonArea.Skip.Upgrade.Size
+local originalSize = gui.SkipFrame.ButtonArea.Skip.Button.Size
 local pressedSize = originalSize - UDim2.new(0, 6, 0, 6) 
 local inTweenInfo = TweenInfo.new(0.02, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local outTweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-gui.SkipFrame.UpgradeArea.ButtonArea.Skip.Upgrade.Activated:Connect(function()
- local wave=info.Wave.Value
- if info:GetAttribute("SkipOpen")~=true or skipChoiceWave==wave then return end
- skipChoiceWave=wave; updateSkipCard(); gui.Sounds.Skip:Play()
- local button=gui.SkipFrame.UpgradeArea.ButtonArea.Skip.Upgrade
- local shrink=TweenService:Create(button,inTweenInfo,{Size=pressedSize})
- local grow=TweenService:Create(button,outTweenInfo,{Size=originalSize})
- shrink.Completed:Once(function() grow:Play() end); shrink:Play()
- local ok,accepted=pcall(function() return voteSkip:InvokeServer(wave) end)
- if (not ok or accepted==false) and info.Wave.Value==wave then skipChoiceWave=nil; updateSkipCard() end
+gui.SkipFrame.ButtonArea.Skip.Button.Activated:Connect(function()
+	local wave=info.Wave.Value
+	if info:GetAttribute("SkipOpen")~=true or skipChoiceWave==wave then return end
+	skipChoiceWave=wave; updateSkipCard(); gui.Sounds.Skip:Play()
+	local button=gui.SkipFrame.ButtonArea.Skip.Button
+	local shrink=TweenService:Create(button,inTweenInfo,{Size=pressedSize})
+	local grow=TweenService:Create(button,outTweenInfo,{Size=originalSize})
+	shrink.Completed:Once(function() grow:Play() end); shrink:Play()
+	local ok,accepted=pcall(function() return voteSkip:InvokeServer(wave) end)
+	if (not ok or accepted==false) and info.Wave.Value==wave then skipChoiceWave=nil; updateSkipCard() end
 end)
-local originalSize = gui.SkipFrame.UpgradeArea.ButtonArea.Pass.Upgrade.Size
+local originalSize = gui.SkipFrame.ButtonArea.Pass.Button.Size
 local pressedSize = originalSize - UDim2.new(0, 6, 0, 6) 
 local inTweenInfo = TweenInfo.new(0.02, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local outTweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-gui.SkipFrame.UpgradeArea.ButtonArea.Pass.Upgrade.Activated:Connect(function()
- local wave=info.Wave.Value
- if info:GetAttribute("SkipOpen")~=true or skipChoiceWave==wave then return end
- skipChoiceWave=wave; updateSkipCard(); gui.Sounds.Skip:Play()
- local button=gui.SkipFrame.UpgradeArea.ButtonArea.Pass.Upgrade
- local shrink=TweenService:Create(button,inTweenInfo,{Size=pressedSize})
- local grow=TweenService:Create(button,outTweenInfo,{Size=originalSize})
- shrink.Completed:Once(function() grow:Play() end); shrink:Play()
+gui.SkipFrame.ButtonArea.Pass.Button.Activated:Connect(function()
+	local wave=info.Wave.Value
+	if info:GetAttribute("SkipOpen")~=true or skipChoiceWave==wave then return end
+	skipChoiceWave=wave; updateSkipCard(); gui.Sounds.Skip:Play()
+	local button=gui.SkipFrame.ButtonArea.Pass.Button
+	local shrink=TweenService:Create(button,inTweenInfo,{Size=pressedSize})
+	local grow=TweenService:Create(button,outTweenInfo,{Size=originalSize})
+	shrink.Completed:Once(function() grow:Play() end); shrink:Play()
 end)
 workspace.Info.VoteSkipValue.Changed:Connect(updateSkipCard)
 
@@ -5669,48 +5669,48 @@ local function LoadGui()
 	local messageFrame = gui.Info.Messages
 	local messageText = messageFrame.ActualMessage.Message
 
- local tweenTime=0.4
- local originalPosition=messageFrame.Position
- local hiddenPosition=originalPosition-UDim2.new(0,0,1.3,0)
- local messageVersion=0
- local activeTween
- local alive=true
- messageFrame.Position=hiddenPosition; messageFrame.Visible=false; messageText.Text=""
- local function cancelTween()
-  if activeTween then activeTween:Cancel(); activeTween=nil end
- end
- local function showReward(change)
-  -- This banner is only for wave rewards; server phase/status text stays private to its UI.
-  if type(change)~="string" or not change:match("^%$[%d,]+%s+Wave Bonus%s*$") then return end
-  messageVersion+=1
-  local version=messageVersion
-  cancelTween()
-  messageText.Text=change; messageFrame.Visible=true
-  activeTween=TweenService:Create(messageFrame,TweenInfo.new(tweenTime,Enum.EasingStyle.Sine,Enum.EasingDirection.Out),{Position=originalPosition})
-  activeTween:Play()
-  -- Hold for five real seconds after the entrance finishes, independent of timescale
-  -- and the server clearing Info.Message during the intermission countdown.
-  task.delay(5+tweenTime,function()
-   if not alive or version~=messageVersion then return end
-   cancelTween()
-   activeTween=TweenService:Create(messageFrame,TweenInfo.new(tweenTime,Enum.EasingStyle.Sine,Enum.EasingDirection.In),{Position=hiddenPosition})
-   activeTween.Completed:Once(function(state)
-    if alive and version==messageVersion and state==Enum.PlaybackState.Completed then messageFrame.Visible=false end
-   end)
-   activeTween:Play()
-  end)
- end
- local function onMessage(change)
-  if change=="VICTORY" or change=="GAME OVER" then
-   messageVersion+=1; cancelTween(); messageFrame.Visible=false; messageText.Text=""
-   if not GameWrapUp then DisplayEndScreen(change) end
-  else showReward(change) end
- end
- local messageConnection=info.Message.Changed:Connect(onMessage)
- script.Destroying:Connect(function()
-  alive=false; messageVersion+=1; cancelTween(); messageConnection:Disconnect()
- end)
- onMessage(info.Message.Value)
+	local tweenTime=0.4
+	local originalPosition=messageFrame.Position
+	local hiddenPosition=originalPosition-UDim2.new(0,0,1.3,0)
+	local messageVersion=0
+	local activeTween
+	local alive=true
+	messageFrame.Position=hiddenPosition; messageFrame.Visible=false; messageText.Text=""
+	local function cancelTween()
+		if activeTween then activeTween:Cancel(); activeTween=nil end
+	end
+	local function showReward(change)
+		-- This banner is only for wave rewards; server phase/status text stays private to its UI.
+		if type(change)~="string" or not change:match("^%$[%d,]+%s+Wave Bonus%s*$") then return end
+		messageVersion+=1
+		local version=messageVersion
+		cancelTween()
+		messageText.Text=change; messageFrame.Visible=true
+		activeTween=TweenService:Create(messageFrame,TweenInfo.new(tweenTime,Enum.EasingStyle.Sine,Enum.EasingDirection.Out),{Position=originalPosition})
+		activeTween:Play()
+		-- Hold for five real seconds after the entrance finishes, independent of timescale
+		-- and the server clearing Info.Message during the intermission countdown.
+		task.delay(3+tweenTime,function()
+			if not alive or version~=messageVersion then return end
+			cancelTween()
+			activeTween=TweenService:Create(messageFrame,TweenInfo.new(tweenTime,Enum.EasingStyle.Sine,Enum.EasingDirection.In),{Position=hiddenPosition})
+			activeTween.Completed:Once(function(state)
+				if alive and version==messageVersion and state==Enum.PlaybackState.Completed then messageFrame.Visible=false end
+			end)
+			activeTween:Play()
+		end)
+	end
+	local function onMessage(change)
+		if change=="VICTORY" or change=="GAME OVER" then
+			messageVersion+=1; cancelTween(); messageFrame.Visible=false; messageText.Text=""
+			if not GameWrapUp then DisplayEndScreen(change) end
+		else showReward(change) end
+	end
+	local messageConnection=info.Message.Changed:Connect(onMessage)
+	script.Destroying:Connect(function()
+		alive=false; messageVersion+=1; cancelTween(); messageConnection:Disconnect()
+	end)
+	onMessage(info.Message.Value)
 
 
 	SetupVoteGui()
