@@ -142,7 +142,8 @@ local function bind()
  bindChoice(general,'VFX','VFX',{High='High',Low='Low'})
  bindChoice(general,'UIScale','UIScale',{Small='Small',Default='Default',Large='Large'})
  local settings=gui:FindFirstChild('Settings')
- local open=button(settings and settings:FindFirstChild('OpenSettings'))
+ local misc=gui:FindFirstChild('Misc')
+ local open=button(misc and misc:FindFirstChild('Settings')) or button(settings and settings:FindFirstChild('OpenSettings'))
  local close=button(panel:FindFirstChild('Close'))
  if open then connect(open,'Activated',function() panel.Visible=not panel.Visible; if not panel.Visible then finishDrag() end; Scale.Dirty=true end) end
  if close then connect(close,'Activated',function() finishDrag(); panel.Visible=false end) end
@@ -189,10 +190,10 @@ table.insert(connections,workspace:GetPropertyChangedSignal('CurrentCamera'):Con
 table.insert(connections,gui.DescendantAdded:Connect(function(object)
  local current=object; local relevant=false
  while current and current~=gui do
-  if current.Name=='FullSettings' or current.Name=='OpenSettings' then relevant=true; break end
+  if current.Name=='FullSettings' or current.Name=='OpenSettings' or (current.Name=='Settings' and current.Parent and current.Parent.Name=='Misc') then relevant=true; break end
   current=current.Parent
  end
- if relevant and (object.Name=='FullSettings' or object.Name=='SettingsArea' or object.Name=='SoundSettings' or object.Name=='GeneralSettings' or object.Name=='ButtonSection' or object.Name=='End' or object.Name=='Button' or object.Name=='Close' or object.Name=='OpenSettings') then
+ if relevant and (object.Name=='FullSettings' or object.Name=='SettingsArea' or object.Name=='SoundSettings' or object.Name=='GeneralSettings' or object.Name=='ButtonSection' or object.Name=='End' or object.Name=='Button' or object.Name=='Close' or object.Name=='OpenSettings' or object.Name=='Settings') then
   if not rebindQueued then rebindQueued=true; task.defer(bind) end
  end
 end))

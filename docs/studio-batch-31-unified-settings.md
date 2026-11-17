@@ -70,7 +70,7 @@ The controller lives directly under GameGui and expects the provided hierarchy:
 
 ```text
 GameGui
-  Settings.OpenSettings.Button       (existing open control)
+  Misc.Settings.Button               (current open control)
   FullSettings
     Frame                            (decorative line; unchanged)
     Close                            (ImageButton or wrapper containing a button)
@@ -88,6 +88,8 @@ GameGui
         UIScale.ButtonSection.Default.Button
         UIScale.ButtonSection.Large.Button
 ```
+
+The old Settings.OpenSettings.Button opener is also accepted as a fallback. The current Misc.Settings.Button opener and updated SkipFrame.ButtonArea paths from the latest GitHub edits are preserved, along with the edited three-second reward banner hold.
 
 Direct ImageButton/TextButton options and wrappers with Button/Upgrade children are supported. A sound section named Volume is accepted as an alias for Music. Both SoundSettings and GeneralSettings stay visible; there are no obsolete category-tab handlers. Frame, SettingsName, aspect ratio, corners, strokes, layout constraints, and authored sizes/vertical positions remain customizable.
 

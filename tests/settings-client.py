@@ -89,7 +89,7 @@ for key,names in {Dialogue={'Default','Off'},VFX={'High','Low'},UIScale={'Small'
 end
 local cash=node('Frame','Cash',gui)
 local animationScale=node('UIScale','AnimationScale',general); animationScale.Scale=0.83
-local settings=node('Frame','Settings',gui); settings:SetAttribute('SettingsScaleIgnore',true); local openFrame=node('Frame','OpenSettings',settings); local open=node('TextButton','Button',openFrame)
+local settings=node('Frame','Misc',gui); settings:SetAttribute('SettingsScaleIgnore',true); local openFrame=node('Frame','Settings',settings); local open=node('TextButton','Button',openFrame)
 local music=node('Folder','Music',world); local ambient=node('Folder','Ambience',world); local towers=node('Folder','Towers',world)
 local track=node('Sound','Theme',music); track.Volume=0.7
 local background=node('Sound','Rain',ambient); background.Volume=0.3
