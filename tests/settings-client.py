@@ -77,8 +77,8 @@ local area=node('Frame','SettingsArea',panel); local sound=node('Frame','SoundSe
 local rows={}
 for _,name in {'Towers','Ambience','Music'} do
  local row=node('Frame',name,sound); local bar=node('Frame','VolumeBar',row); bar.AbsoluteSize=v(200,20); bar.AbsolutePosition=v(100,0)
- local slider=node('Frame','Slider',bar); slider.AbsoluteSize=v(200,20); slider.AbsolutePosition=v(100,0)
- local endFrame=node('Frame','End',slider); endFrame.AbsoluteSize=v(20,20)
+ local slider=node('Frame','Slider',bar); slider.Size=dim(1,0,1,0); slider.AbsoluteSize=v(200,20); slider.AbsolutePosition=v(100,0)
+ local endFrame=node('Frame','End',slider); endFrame.Size=dim(0,20,0,20); endFrame.AbsoluteSize=v(20,20)
  local knob=node('ImageButton','Button',endFrame); knob.AbsoluteSize=v(16,16)
  local label=node('TextLabel','SectionTitle',bar); rows[name]={Bar=bar,Track=slider,End=endFrame,Knob=knob,Label=label}
 end
@@ -135,15 +135,20 @@ local originalGroup=attack.SoundGroup; assert(originalGroup~=authored and origin
 local mouse={UserInputType='MouseButton1',Position=v(170,0)}
 rows.Music.Bar.InputBegan:Fire(mouse)
 input.InputChanged:Fire({UserInputType='MouseMovement',Position=v(240,0)})
-assert(rows.Music.End.Position.X.Offset==0,'knob wrapper positioning must stay scale-independent')
+assert(math.abs(rows.Music.Track.Size.X.Scale-0.722)<0.001,'Slider parent must reflect the selected fill amount')
+assert(rows.Music.End.Size.X.Offset==20,'shrinking the fill must not shrink the knob')
 assert(rows.Music.Knob.Position.X.Scale==0.5 and rows.Music.End.Position.X.Scale>0.5,'move End along the track without displacing its inner button')
 assert(#sent==0 and rows.Music.Label.Text=='72%' and math.abs(track.SoundGroup.Volume-0.722)<0.001,'drag applies local volume continuously without remote spam')
 assert(background.SoundGroup.Volume==1,'music slider must not affect ambience')
 local unrelated=node('TextButton','Button',gui); step(0.01); assert(#sent==0,'unrelated UI additions must not end an active settings drag')
 input.InputEnded:Fire(mouse); assert(#sent==1 and sent[1][1]=='Music' and sent[1][2]==72.2)
+local extra=node('ImageButton','Button',panel); step(0.01)
+assert(math.abs(rows.Music.Track.Size.X.Scale-0.722)<0.001,'rebinding must not multiply the previous fill width')
 local touch={UserInputType='Touch',Position=v(110,0)}; rows.Ambience.Track.InputBegan:Fire(touch)
 input.InputChanged:Fire({UserInputType='Touch',Position=v(290,0)}); assert(rows.Ambience.Label.Text=='0%','second touch must not hijack the drag')
-input.InputEnded:Fire(touch); assert(sent[2][1]=='Ambience' and sent[2][2]==0)
+input.InputEnded:Fire(touch); assert(sent[2][1]=='Ambience' and sent[2][2]==0 and rows.Ambience.Track.Size.X.Scale==0,'zero volume must empty the fill')
+local full={UserInputType='Touch',Position=v(290,0)}; rows.Ambience.Bar.InputBegan:Fire(full); input.InputEnded:Fire(full)
+assert(sent[3][2]==100 and rows.Ambience.Track.Size.X.Scale==1,'the whole bar remains interactive after the fill is empty')
 options.VFX.Low.Activated:Fire(); assert(player.VFX.Value=='Low' and emitter.Rate==25 and not emitter.Enabled and not lighting.GlobalShadows)
 local policy=load('policy'); policy.Emit(emitter,100); assert(emitter.Emitted==24)
 for _=1,20 do policy.Emit(emitter,100) end; assert(emitter.Emitted==96,'global burst budget must remain bounded')

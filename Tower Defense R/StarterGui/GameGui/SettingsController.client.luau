@@ -16,6 +16,7 @@ local remote=Rep:WaitForChild('Events'):WaitForChild('PlayerSettingChange')
 local values=Schema.Normalize()
 local connections,uiConnections={},{}
 local sliders,choices={},{}
+local sliderDefaults=setmetatable({}, {__mode="k"})
 local dragged
 local panel
 local dirtyCommit={}
@@ -43,15 +44,39 @@ local function mark(object,selected)
   if on then on.Enabled=selected end; if off then off.Enabled=not selected end
  end
 end
+local function pixelScale(object)
+ local scale=1
+ while object and object~=player do
+  if object:IsA('GuiObject') then
+   local scaler=object:FindFirstChildWhichIsA('UIScale')
+   if scaler then scale*=math.max(0.001,scaler.Scale) end
+  end
+  object=object.Parent
+ end
+ return scale
+end
 local function render()
  for key,slider in sliders do
   local percent=values[key]/100
   slider.Mover.AnchorPoint=Vector2.new(0.5,slider.Mover.AnchorPoint.Y)
-  local y=slider.Mover.Position.Y
-  local ratio=math.clamp(slider.Mover.AbsoluteSize.X/math.max(1,slider.Track.AbsoluteSize.X),0,1)
-  slider.Mover.Position=UDim2.new(ratio*0.5+(1-ratio)*percent,0,y.Scale,y.Offset)
+  if slider.ParentFill then
+   local base=slider.Base
+   local width=slider.Track.AbsoluteSize.X/math.max(0.001,pixelScale(slider.Track))
+   local fullWidth=width*base.Size.X.Scale+base.Size.X.Offset
+   local knobWidth=math.max(1,fullWidth*base.KnobSize.X.Scale+base.KnobSize.X.Offset)
+   slider.Mover.Size=UDim2.new(0,knobWidth,base.KnobSize.Y.Scale,base.KnobSize.Y.Offset)
+   slider.Fill.AnchorPoint=Vector2.new(0,base.Anchor.Y)
+   slider.Fill.Position=UDim2.new(base.Position.X.Scale-base.Anchor.X*base.Size.X.Scale,base.Position.X.Offset-base.Anchor.X*base.Size.X.Offset,base.Position.Y.Scale,base.Position.Y.Offset)
+   slider.Fill.Size=UDim2.new(base.Size.X.Scale*percent,base.Size.X.Offset*percent,base.Size.Y.Scale,base.Size.Y.Offset)
+   slider.Fill.ClipsDescendants=false
+   slider.Mover.Position=UDim2.new(1,(0.5-percent)*knobWidth,base.KnobPosition.Y.Scale,base.KnobPosition.Y.Offset)
+  else
+   local y=slider.Mover.Position.Y
+   local ratio=math.clamp(slider.Mover.AbsoluteSize.X/math.max(1,slider.Track.AbsoluteSize.X),0,1)
+   slider.Mover.Position=UDim2.new(ratio*0.5+(1-ratio)*percent,0,y.Scale,y.Offset)
+   if slider.Fill then slider.Fill.Size=UDim2.new(percent,0,slider.Fill.Size.Y.Scale,slider.Fill.Size.Y.Offset) end
+  end
   if slider.Label then slider.Label.Text=tostring(math.round(values[key]))..'%' end
-  if slider.Fill then slider.Fill.Size=UDim2.new(percent,0,slider.Fill.Size.Y.Scale,slider.Fill.Size.Y.Offset) end
   slider.Button.Interactable=ready()
  end
  for key,options in choices do
@@ -93,14 +118,20 @@ local function bindSlider(section,key)
  if not bar or not slider or not knob then warn('Settings: missing '..key..'.VolumeBar.Slider.End.Button'); return end
  local override=slider:GetAttribute('SettingsSliderTrack')
  local isTrack=if type(override)=='boolean' then override else slider~=knob and slider.AbsoluteSize.X>=bar.AbsoluteSize.X*0.8
- local record=if endFrame and endFrame:IsA('GuiObject') then {Key=key,Track=slider,Mover=endFrame,Button=knob}
+ local record=if endFrame and endFrame:IsA('GuiObject') then {Key=key,Track=bar,Mover=endFrame,Button=knob,ParentFill=true}
   else {Key=key,Track=if isTrack then slider else bar,Mover=if isTrack or slider==knob then knob else slider,Button=knob}
  local label=bar:FindFirstChild('SectionTitle')
  record.Label=if label and (label:IsA('TextLabel') or label:IsA('TextButton')) then label else nil
- record.Fill=record.Track:FindFirstChild('Fill'); if record.Fill and not record.Fill:IsA('GuiObject') then record.Fill=nil end; sliders[key]=record
+ if record.ParentFill then
+  sliderDefaults[slider]=sliderDefaults[slider] or {Size=slider.Size,Position=slider.Position,Anchor=slider.AnchorPoint,KnobSize=endFrame.Size,KnobPosition=endFrame.Position}
+  record.Base=sliderDefaults[slider]; record.Fill=slider
+ else
+  record.Fill=record.Track:FindFirstChild('Fill'); if record.Fill and not record.Fill:IsA('GuiObject') then record.Fill=nil end
+ end
+ sliders[key]=record
  knob.NextSelectionLeft=knob; knob.NextSelectionRight=knob
  local targets={}
- for _,target in {bar,record.Track,record.Mover,knob} do
+ for _,target in {bar,slider,record.Track,record.Mover,knob} do
   if not targets[target] then
    targets[target]=true; target.Active=true
    connect(target,'InputBegan',function(input)
@@ -199,7 +230,9 @@ table.insert(connections,gui.DescendantAdded:Connect(function(object)
 end))
 table.insert(connections,RunService.RenderStepped:Connect(function()
  if dragged and not visible(dragged.Slider.Button) then finishDrag() end
+ local fitDirty=Scale.Dirty
  Scale:Step()
+ if fitDirty then render() end
  for key,deadline in dirtyCommit do if os.clock()>=deadline then commit(key) end end
 end))
 script.Destroying:Connect(function()
