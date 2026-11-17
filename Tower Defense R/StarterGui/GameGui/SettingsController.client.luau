@@ -228,7 +228,8 @@ table.insert(connections,gui.DescendantAdded:Connect(function(object)
   if not rebindQueued then rebindQueued=true; task.defer(bind) end
  end
 end))
-table.insert(connections,RunService.RenderStepped:Connect(function()
+table.insert(connections,RunService.RenderStepped:Connect(function(dt)
+ Audio:Step(dt)
  if dragged and not visible(dragged.Slider.Button) then finishDrag() end
  local fitDirty=Scale.Dirty
  Scale:Step()

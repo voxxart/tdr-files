@@ -1,10 +1,12 @@
 local SoundService=game:GetService('SoundService')
+local BossMixer=require(script.Parent.BossMusicMixer)
 local Audio={}; Audio.__index=Audio
 function Audio.new(world)
- local self=setmetatable({World=world,Groups={},Sounds=setmetatable({}, {__mode='k'}),Routes={},SourceByRoute={},RouteCount=0,Roots={},Connections={}},Audio)
+ local self=setmetatable({World=world,Groups={},SceneGroups={},Sounds=setmetatable({}, {__mode='k'}),Routes={},SourceByRoute={},RouteCount=0,Roots={},Connections={}},Audio)
  self.Folder=Instance.new('SoundGroup'); self.Folder.Name='LocalSettingsAudio'; self.Folder.Parent=SoundService
  for _,key in {'Towers','Music','Ambience'} do
   local group=Instance.new('SoundGroup'); group.Name=key; group.Parent=self.Folder; self.Groups[key]=group; self.SourceByRoute[group]=false; self.Routes[key]={}
+  local scene=Instance.new('SoundGroup'); scene.Name='SceneGain'; scene.Parent=group; self.SceneGroups[key]=scene; self.SourceByRoute[scene]=false
  end
  local function added(object)
   if object:IsA('Sound') then self:Attach(object)
@@ -13,6 +15,11 @@ function Audio.new(world)
  table.insert(self.Connections,world.DescendantAdded:Connect(added))
  table.insert(self.Connections,world.DescendantRemoving:Connect(function(object) self:UnwatchRoot(object); self:Release(object) end))
  for _,object in world:GetDescendants() do added(object) end
+ local function infoAdded(object)
+  if not self.BossMixer and object.Name=='Info' then self.BossMixer=BossMixer.new(self,world,object) end
+ end
+ table.insert(self.Connections,world.ChildAdded:Connect(infoAdded))
+ local info=world:FindFirstChild('Info'); if info then infoAdded(info) end
  return self
 end
 function Audio:Release(sound)
@@ -20,6 +27,7 @@ function Audio:Release(sound)
  self.Sounds[sound]=nil
  if record.Connection then record.Connection:Disconnect() end
  sound.SoundGroup=record.Group
+ if record.Fader then self.SourceByRoute[record.Fader]=nil; record.Fader:Destroy() end
 end
 function Audio:UnwatchRoot(root)
  local connections=self.Roots[root]; if not connections then return end
@@ -62,14 +70,14 @@ function Audio:Category(sound)
  return nil
 end
 function Audio:Route(original,category)
- if not original then return self.Groups[category] end
+ if not original then return self.SceneGroups[category] end
  local routes=self.Routes[category]
  if routes[original] then return routes[original] end
- if self.RouteCount>=64 then return self.Groups[category] end
+ if self.RouteCount>=64 then return self.SceneGroups[category] end
  self.RouteCount+=1
  local route=Instance.new('SoundGroup'); route.Name='AuthoredMix'; route.Volume=original.Volume
  local ancestor=original.Parent
- route.Parent=if ancestor and ancestor:IsA('SoundGroup') then self:Route(ancestor,category) else self.Groups[category]
+ route.Parent=if ancestor and ancestor:IsA('SoundGroup') then self:Route(ancestor,category) else self.SceneGroups[category]
  for _,effect in original:GetChildren() do if effect:IsA('SoundEffect') then effect:Clone().Parent=route end end
  routes[original]=route; self.SourceByRoute[route]=original
  -- One listener per authored group, not one per sound.
@@ -87,7 +95,10 @@ function Audio:Attach(sound)
  if record and original==record.Route then original=record.Group end
  if self.SourceByRoute[original]~=nil then original=self.SourceByRoute[original] or nil end
  if record and record.Connection then record.Connection:Disconnect() end
- record={Group=original,Category=category,Route=self:Route(original,category)}
+ local fader=record and record.Fader
+ record={Group=original,Category=category,BaseRoute=self:Route(original,category),Fader=fader}
+ record.Route=record.BaseRoute
+ if fader then fader.Parent=record.BaseRoute; record.Route=fader; self.SourceByRoute[fader]=original or false end
  self.Sounds[sound]=record
  sound.SoundGroup=record.Route
  if category=='Ambience' or category=='Music' then
@@ -96,9 +107,26 @@ function Audio:Attach(sound)
   end)
  end
 end
+function Audio:SoundFader(sound)
+ self:Attach(sound)
+ local record=self.Sounds[sound]; if not record then return nil end
+ if not record.Fader then
+  local group=Instance.new('SoundGroup'); group.Name='BossFade'; group.Volume=0; group.Parent=record.BaseRoute
+  record.Fader=group; record.Route=group; self.SourceByRoute[group]=record.Group or false; sound.SoundGroup=group
+ end
+ return record.Fader
+end
+function Audio:SetSceneGain(category,gain) self.SceneGroups[category].Volume=math.clamp(gain,0,1) end
+function Audio:Step(dt) if self.BossMixer then self.BossMixer:Step(dt) end end
 function Audio:Set(category,percent) self.Groups[category].Volume=math.clamp(percent,0,100)/100 end
 function Audio:Destroy()
  self.Destroyed=true
+ if self.BossMixer then
+  if self.BossMixer.Terminal or self.BossMixer.Final then
+   for sound,record in self.Sounds do if record.Category=='Ambience' and sound.Parent and sound.IsPlaying then sound:Stop() end end
+  end
+  self.BossMixer:Destroy()
+ end
  for _,connections in self.Roots do for _,connection in connections do connection:Disconnect() end end
  table.clear(self.Roots)
  for _,connection in self.Connections do connection:Disconnect() end

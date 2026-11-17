@@ -2,72 +2,12 @@
 from pathlib import Path
 import subprocess,tempfile
 root=Path(__file__).resolve().parents[1]; base=root/'Tower Defense R'
-paths={key:'ReplicatedStorage/GameModules/'+name+'.luau' for key,name in {'schema':'SettingsSchema','math':'SettingsMath','audio':'SettingsAudio','scale':'SettingsScale','effects':'SettingsEffects','policy':'VFXPolicy'}.items()}
+paths={key:'ReplicatedStorage/GameModules/'+name+'.luau' for key,name in {'schema':'SettingsSchema','math':'SettingsMath','audio':'SettingsAudio','scale':'SettingsScale','effects':'SettingsEffects','policy':'VFXPolicy','bossMixer':'BossMusicMixer'}.items()}
 paths['controller']='StarterGui/GameGui/SettingsController.client.luau'
 code='local sources={}\n'+''.join(f'sources.{k}=[====['+(base/v).read_text()+']====]\n' for k,v in paths.items())
+code+='local engineSource=[====['+(root/'tests/fixtures/settings-engine.luau').read_text()+']====]\n'
 code+=r'''
-local function signal()
- local s={Entries={}}
- function s:Connect(fn) local c={Connected=true,F=fn}; function c:Disconnect() self.Connected=false end; table.insert(self.Entries,c); return c end
- function s:Fire(...) for _,c in table.clone(self.Entries) do if c.Connected then c.F(...) end end end
- return s
-end
-local function v(x,y) return {X=x,Y=y} end
-local function dim(xs,xo,ys,yo) return {X={Scale=xs,Offset=xo},Y={Scale=ys,Offset=yo}} end
-local methods={}; local node
-function methods:IsA(kind)
- return self.Class==kind or kind=='GuiObject' and ({Frame=true,TextLabel=true,ImageButton=true,TextButton=true,ScrollingFrame=true})[self.Class] or kind=='GuiButton' and (self.Class=='ImageButton' or self.Class=='TextButton')
-end
-function methods:IsDescendantOf(other) local current=self.Parent; while current do if current==other then return true end; current=current.Parent end; return false end
-function methods:GetChildren() return table.clone(self.Children) end
-function methods:GetDescendants() local out={} for _,child in self.Children do table.insert(out,child); for _,d in child:GetDescendants() do table.insert(out,d) end end return out end
-function methods:FindFirstChild(name,recursive)
- for _,child in self.Children do if child.Name==name then return child end end
- if recursive then for _,child in self.Children do local found=child:FindFirstChild(name,true); if found then return found end end end
-end
-function methods:WaitForChild(name) return assert(self:FindFirstChild(name),name) end
-function methods:FindFirstChildWhichIsA(kind,recursive)
- for _,child in self.Children do if child:IsA(kind) then return child end end
- if recursive then for _,child in self.Children do local found=child:FindFirstChildWhichIsA(kind,true); if found then return found end end end
-end
-function methods:GetAttribute(name) return self.Attributes[name] end
-function methods:SetAttribute(name,value) self.Attributes[name]=value; if self.AttributeSignals[name] then self.AttributeSignals[name]:Fire() end end
-function methods:GetAttributeChangedSignal(name) self.AttributeSignals[name]=self.AttributeSignals[name] or signal(); return self.AttributeSignals[name] end
-function methods:GetPropertyChangedSignal(name) self.PropertySignals[name]=self.PropertySignals[name] or signal(); return self.PropertySignals[name] end
-function methods:Emit(count) self.Emitted=(self.Emitted or 0)+count end
-function methods:Destroy() self.Destroying:Fire(); self.Parent=nil; self.Destroyed=true end
-function methods:Clone()
- local copy=node(self.Class,self.Name)
- for key,value in self.Props do if key~='Parent' then copy.Props[key]=value end end
- copy.Attributes=table.clone(self.Attributes)
- for _,child in self.Children do child:Clone().Parent=copy end
- return copy
-end
-node=function(class,name,parent)
- local n={Class=class,Children={},Attributes={},AttributeSignals={},PropertySignals={},Props={Name=name or class,Scale=1,Volume=1,Rate=40,Enabled=true,Visible=true,AbsoluteSize=v(100,30),AbsolutePosition=v(0,0),AnchorPoint=v(0.5,0.5),Size=dim(0,100,0,30),Position=dim(0.5,0,0.5,0)},Destroying=signal(),ChildAdded=signal(),DescendantAdded=signal(),DescendantRemoving=signal(),InputBegan=signal(),Activated=signal()}
- setmetatable(n,{__index=function(self,key) return methods[key] or self.Props[key] or self:FindFirstChild(key) end,
- __newindex=function(self,key,value)
-  if key=='Parent' then
-   local old=self.Props.Parent
-   local common={}; local current=value; while current do common[current]=true; current=current.Parent end
-   if old then for i,c in old.Children do if c==self then table.remove(old.Children,i); break end end; local a=old; while a do if not common[a] then a.DescendantRemoving:Fire(self) end; a=a.Parent end end
-   self.Props.Parent=value
-   if value then table.insert(value.Children,self); value.ChildAdded:Fire(self); local a=value; while a do if not old or (old~=a and not old:IsDescendantOf(a)) then a.DescendantAdded:Fire(self) end; a=a.Parent end end
-  else
-   local old=self.Props[key]; self.Props[key]=value
-   if key=='AbsoluteSize' and self.Class=='ScreenGui' then
-    for _,child in self.Children do if child.BaseSize then child.Props.AbsolutePosition=v(value.X*0.5-child.AbsoluteSize.X*0.5,value.Y*0.5-child.AbsoluteSize.Y*0.5) end end
-   end
-   if key=='Scale' and self.Class=='UIScale' and self.Parent and self.Parent.BaseSize then
-    local root=self.Parent; root.Props.AbsoluteSize=v(root.BaseSize.X*value,root.BaseSize.Y*value)
-    root.Props.AbsolutePosition=v(root.Parent.AbsoluteSize.X*0.5-root.AbsoluteSize.X*0.5,root.Parent.AbsoluteSize.Y*0.5-root.AbsoluteSize.Y*0.5)
-   end
-   if old~=value and self.PropertySignals[key] then self.PropertySignals[key]:Fire() end
-  end
- end})
- if parent then n.Parent=parent end
- return n
-end
+local engine=assert(loadstring(engineSource))(); local signal,node,v,dim=engine.Signal,engine.Node,engine.Vector,engine.Dim
 local world=node('Workspace'); local soundService=node('SoundService'); local lighting=node('Lighting'); lighting.GlobalShadows=false
 local player=node('Player'); local playerGui=node('PlayerGui','PlayerGui',player)
 local gui=node('ScreenGui','GameGui',playerGui); gui.AbsoluteSize=v(800,600); gui.AbsolutePosition=v(0,0)
@@ -103,7 +43,7 @@ local input={InputChanged=signal(),InputEnded=signal(),InputBegan=signal(),Windo
 local guiService={}; local render=signal(); local destroying=signal(); local now=0; local pending={}; local sent={}
 local rep=node('Folder'); local modules=node('Folder','GameModules',rep); local events=node('Folder','Events',rep); local remote=node('RemoteEvent','PlayerSettingChange',events)
 function remote:FireServer(...) table.insert(sent,table.pack(...)) end
-for key,name in {schema='SettingsSchema',math='SettingsMath',audio='SettingsAudio',scale='SettingsScale',effects='SettingsEffects',policy='VFXPolicy'} do local m=node('ModuleScript',name,modules); m.Key=key end
+for key,name in {schema='SettingsSchema',math='SettingsMath',audio='SettingsAudio',scale='SettingsScale',effects='SettingsEffects',policy='VFXPolicy',bossMixer='BossMusicMixer'} do local m=node('ModuleScript',name,modules); m.Key=key end
 local loaded={}
 local environment=setmetatable({workspace=world,Instance={new=node},Vector2={new=v},UDim2={new=dim},script={Parent=gui,Destroying=destroying},os={clock=function() return now end},
  Enum={UserInputType={MouseButton1='MouseButton1',MouseMovement='MouseMovement',Touch='Touch'},KeyCode={Escape='Escape',ButtonB='ButtonB',Left='Left',Right='Right',DPadLeft='DPadLeft',DPadRight='DPadRight',Home='Home',End='End'}},
@@ -133,14 +73,19 @@ assert(not cash:FindFirstChildWhichIsA('UIScale'),'transient popup templates mus
 assert(sound.Visible and general.Visible and animationScale.Scale==0.83,'new layout sections and nested animation scales must be preserved')
 assert(track.Volume==0.7 and background.Volume==0.3 and attack.Volume==0.9,'authored sound volumes must not be flattened')
 local originalGroup=attack.SoundGroup; assert(originalGroup~=authored and originalGroup.Volume==0.8 and originalGroup:FindFirstChild('Reverb'))
+local function mixGain(sound)
+ local group=sound.SoundGroup; local gain=1
+ while group and group:IsA('SoundGroup') do gain*=group.Volume; group=group.Parent end
+ return gain
+end
 local mouse={UserInputType='MouseButton1',Position=v(170,0)}
 rows.Music.Bar.InputBegan:Fire(mouse)
 input.InputChanged:Fire({UserInputType='MouseMovement',Position=v(240,0)})
 assert(math.abs(rows.Music.Track.Size.X.Scale-0.722)<0.001,'Slider parent must reflect the selected fill amount')
 assert(rows.Music.End.Size.X.Offset==20,'shrinking the fill must not shrink the knob')
 assert(rows.Music.Knob.Position.X.Scale==0.5 and rows.Music.End.Position.X.Scale>0.5,'move End along the track without displacing its inner button')
-assert(#sent==0 and rows.Music.Label.Text=='72%' and math.abs(track.SoundGroup.Volume-0.722)<0.001,'drag applies local volume continuously without remote spam')
-assert(background.SoundGroup.Volume==1,'music slider must not affect ambience')
+assert(#sent==0 and rows.Music.Label.Text=='72%' and math.abs(mixGain(track)-0.722)<0.001,'drag applies local volume continuously without remote spam')
+assert(mixGain(background)==1,'music slider must not affect ambience')
 local unrelated=node('TextButton','Button',gui); step(0.01); assert(#sent==0,'unrelated UI additions must not end an active settings drag')
 input.InputEnded:Fire(mouse); assert(#sent==1 and sent[1][1]=='Music' and sent[1][2]==72.2)
 local extra=node('ImageButton','Button',panel); step(0.01)
@@ -154,8 +99,8 @@ assert(nestedRain.SoundGroup==background.SoundGroup,'map-local ambience folders 
 local touch={UserInputType='Touch',Position=v(110,0)}; rows.Ambience.Track.InputBegan:Fire(touch)
 input.InputChanged:Fire({UserInputType='Touch',Position=v(290,0)}); assert(rows.Ambience.Label.Text=='0%','second touch must not hijack the drag')
 input.InputEnded:Fire(touch); assert(sent[2][1]=='Ambience' and sent[2][2]==0 and rows.Ambience.Track.Size.X.Scale==0,'zero volume must empty the fill')
-assert(movedAmbience.SoundGroup.Volume==0 and nestedRain.SoundGroup.Volume==0,'ambience mute must affect moved and map-local sounds')
-movedAmbience.SoundGroup=nil; assert(movedAmbience.SoundGroup and movedAmbience.SoundGroup.Volume==0,'later routing resets must not bypass ambience mute')
+assert(mixGain(movedAmbience)==0 and mixGain(nestedRain)==0,'ambience mute must affect moved and map-local sounds')
+movedAmbience.SoundGroup=nil; assert(movedAmbience.SoundGroup and mixGain(movedAmbience)==0,'later routing resets must not bypass ambience mute')
 movedAmbience.Parent=music; step(0.01); assert(movedAmbience.SoundGroup==track.SoundGroup,'reparented sounds must switch categories without keeping stale routing')
 local full={UserInputType='Touch',Position=v(290,0)}; rows.Ambience.Bar.InputBegan:Fire(full); input.InputEnded:Fire(full)
 assert(sent[3][2]==100 and rows.Ambience.Track.Size.X.Scale==1,'the whole bar remains interactive after the fill is empty')

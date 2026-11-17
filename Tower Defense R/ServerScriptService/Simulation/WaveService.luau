@@ -10,7 +10,7 @@ mobs.ChildRemoved:Connect(function() enemyCount=math.max(0,enemyCount-1) end)
 local Service={State=State.new(),Pending=0}
 local configuredDuration=math.max(0,info.Min.Value*60+info.Sec.Value)
 if configuredDuration==0 then configuredDuration=90 end
-local lastSecond,lastOpen,lastVotes,lastRequired,lastSpawning
+local lastSecond,lastOpen,lastVotes,lastRequired,lastSpawning,lastActive
 local function roster(exclude)
  local result={}; for _,player in Players:GetPlayers() do if player~=exclude then result[player.UserId]=true end end; return result
 end
@@ -19,6 +19,7 @@ local function publish(exclude)
  local votes=state:Count(players); local required=state:Required(total)
  if votes~=lastVotes then info.VoteSkipValue.Value=votes; lastVotes=votes end
  if required~=lastRequired then info:SetAttribute('SkipRequired',required); lastRequired=required end
+ if state.Active~=lastActive then info:SetAttribute('WaveActive',state.Active); lastActive=state.Active end
  local open=state.Active and state.Open
  if open~=lastOpen then
   info:SetAttribute('SkipOpen',open); Rep.Events.SkipButton:FireAllClients(true,not open); lastOpen=open
