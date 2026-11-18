@@ -57,13 +57,20 @@ heartbeat.fn()
 assert(next(cache.Owned)==nil,'active bolt registry lost a bolt')
 for _,b in bolts do b:Destroy() end -- repeat destroy must be harmless
 local frozen=Lightning.new(anchor,anchor,6)
+frozen.Jagged=true
+frozen.Attachment1={WorldPosition=vector(12,0,0),WorldAxis=vector(1,0,0)}
 frozen.Static=true; frozen.StaticLifetime=1000
 frozen.OpacityProfileFunction=function() return 1 end
 local geometryCalls=0
-function frozen:_UpdateGeometry(part) geometryCalls+=1; part.Transparency=0 end
+local points={}
+function frozen:_UpdateGeometry(part, _, _, _, _, nextPoint) geometryCalls+=1; part.Transparency=0; table.insert(points,nextPoint) end
 function frozen:_UpdateColor() end
 heartbeat.fn()
 assert(geometryCalls==6 and frozen._StaticRendered,'static bolt not built')
+assert(points[6].X==12 and points[6].Y==0 and points[6].Z==0,'endpoint moved')
+local hasKink=false
+for i=1,5 do if math.abs(points[i].Y)>0.001 then hasKink=true end end
+assert(hasKink,'jagged bolt has no vertical kinks')
 heartbeat.fn(); heartbeat.fn()
 assert(geometryCalls==6,'static bolt geometry rebuilt every frame')
 frozen._StartT=-100000

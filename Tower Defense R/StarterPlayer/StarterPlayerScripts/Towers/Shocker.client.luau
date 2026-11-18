@@ -41,6 +41,7 @@ local function createBolt(startPos, endPos, low)
 	local bolt = LightningBolt.new(
 		{WorldPosition = startPos, WorldAxis = axis},
 		{WorldPosition = endPos, WorldAxis = axis}, count)
+	bolt.Jagged = true
 	bolt.Static = true
 	bolt.StaticLifetime = LIFETIME
 	bolt.Color = COLOR
@@ -48,9 +49,9 @@ local function createBolt(startPos, endPos, low)
 	bolt.AnimationSpeed = 0
 	bolt.Frequency = 1
 	bolt.MinRadius = 0
-	bolt.MaxRadius = math.min(0.65, distance * 0.07)
-	bolt.Thickness = 0.13
-	bolt.MinThicknessMultiplier = 1
+	bolt.MaxRadius = math.min(1.1, distance * 0.16)
+	bolt.Thickness = 0.095
+	bolt.MinThicknessMultiplier = 0.65
 	bolt.MaxThicknessMultiplier = 1
 	bolt.ContractFrom = 2
 	bolt.OpacityProfileFunction = opacity

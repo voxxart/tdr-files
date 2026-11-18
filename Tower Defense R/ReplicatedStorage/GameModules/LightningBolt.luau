@@ -78,6 +78,7 @@ function LightningBolt.new(Attachment0, Attachment1, PartCount)
 
 	--Bolt Appearance Properties
 
+	self.Jagged = false --Opt-in sharp, three-dimensional electrical kinks.
 	self.Static = false --Opt-in snapshot geometry: build once, then only update opacity.
 	self.Enabled = true --Hides bolt without removing any parts when false
 	self.Attachment0, self.Attachment1 = Attachment0, Attachment1 --Bolt originates from Attachment0 and ends at Attachment1
@@ -366,6 +367,16 @@ RunService.Heartbeat:Connect(function()
 
 					if i == PartsN then
 						NextPoint = bezier1
+					elseif ThisBranch.Jagged then
+						-- Independent offsets at each joint create sharp corners rather than
+						-- a smooth wave. The seed stays fixed for the entire shot.
+						local radius = math.min(MaxRadius, (p3 - p0).Magnitude / PartsN * 0.45)
+						local sample = i * 2.173 + 0.37
+						NextPoint = bezier1 + Vector3.new(
+							math.noise(sample, RanNum, 11.7),
+							math.noise(sample, RanNum, 47.3),
+							math.noise(sample, RanNum, 83.9)
+						) * (radius * 2)
 					else
 						local progress = PercentAlongBolt
 

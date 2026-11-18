@@ -51,7 +51,7 @@ assert(#bolts==8,'must render all eight links')
 for i,b in bolts do
  assert(b.AnimationSpeed==0 and b.ColorOffsetSpeed==0)
  assert(b.Static==true and b.StaticLifetime==0.16)
- assert(b.MinThicknessMultiplier==b.MaxThicknessMultiplier)
+ assert(b.Jagged and b.MinThicknessMultiplier>0 and b.MinThicknessMultiplier<b.MaxThicknessMultiplier)
  assert(b.Start.WorldPosition.X==(i-1)*10 and b.Finish.WorldPosition.X==i*10)
  assert(b.OpacityProfileFunction(0.5,0)==1)
  assert(b.OpacityProfileFunction(0.5,0.14)>0 and b.OpacityProfileFunction(0.5,0.14)<1)
