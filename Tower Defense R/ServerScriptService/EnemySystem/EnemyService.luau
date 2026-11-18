@@ -501,7 +501,6 @@ function EnemyService.Explode(runtimeOrModel, radius)
 			local config = tower:FindFirstChild("Config")
 			local healthFolder = config and config:FindFirstChild("Health")
 			local health = healthFolder and healthFolder:FindFirstChild("HealthValue")
-			local maxHealth = healthFolder and healthFolder:FindFirstChild("MaxHealth")
 
 			local flying =
 				config
@@ -522,10 +521,10 @@ function EnemyService.Explode(runtimeOrModel, radius)
 				stunned.Value = math.max(stunned.Value, 3)
 			end
 
-			if health and maxHealth and not flying then
+			if health and not flying then
 				health.Value = math.max(
 					0,
-					health.Value - math.round(maxHealth.Value * 0.125)
+					health.Value - 12.5
 				)
 			end
 

@@ -34,9 +34,9 @@ function Attack.new(enemy, definition)
 				end
 			end
 			local ok, err = pcall(function()
-				local fraction = if workspace.Info.Modifiers['Death Wish'].Value then definition.DeathWishDamage else definition.Damage
+				local flatDamage = if workspace.Info.Modifiers['Death Wish'].Value then (definition.DeathWishDamage or definition.Damage) else definition.Damage
 				local health = target.Config.Health
-				local amount = Amount.Percent(health.HealthValue.Value, health.MaxHealth.Value, fraction, definition.RoundRemaining)
+				local amount = Amount.Flat(flatDamage)
 				Damage.Apply(target, if definition.Lethal then health.HealthValue.Value else amount, generation, definition.DeathDelay)
 				if definition.Hold then
 					if speed then speed.Value = 0 end

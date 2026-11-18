@@ -1,8 +1,11 @@
+-- Flat HP damage, independent of the target's maximum health.
 local DamageAmount = {}
-function DamageAmount.Percent(currentHealth, maxHealth, fraction, roundRemaining)
-	if roundRemaining then
-		return currentHealth - math.round(currentHealth - maxHealth * fraction)
+
+function DamageAmount.Flat(amount)
+	if type(amount) ~= "number" or amount ~= amount or math.abs(amount) == math.huge then
+		return 0
 	end
-	return math.round(maxHealth * fraction)
+	return math.max(0, amount)
 end
+
 return DamageAmount

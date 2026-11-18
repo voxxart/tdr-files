@@ -81,7 +81,7 @@ local function resolveOwner(tower)
 end
 
 -- Applies damage to a tower, returns true if it died
-local function damageTower(tower, percent)
+local function damageTower(tower, amount)
 	local config = tower:FindFirstChild("Config")
 	if not config then
 		warn("[AirStrike] damageTower: no Config on", tower)
@@ -97,13 +97,7 @@ local function damageTower(tower, percent)
 		warn("[AirStrike] damageTower: no HealthValue on", tower, "| Health children:", health:GetChildren())
 		return false
 	end
-	local maxHealth = health:FindFirstChild("MaxHealth")
-	if not maxHealth then
-		warn("[AirStrike] damageTower: no MaxHealth on", tower, "| Health children:", health:GetChildren())
-		return false
-	end
-
-	local damage = maxHealth.Value * percent
+	local damage = amount
 	local before = healthValue.Value
 	healthValue.Value = math.max(0, healthValue.Value - damage)
 	local died = healthValue.Value <= 0
@@ -236,8 +230,8 @@ local function doAirStrike(enemy, state)
 
 		-- Damage primary target
 		local isFlying = config and config:FindFirstChild("Flying") ~= nil
-		local primaryPct = isFlying and 0.77 or 0.90
-		if damageTower(target, primaryPct) then
+		local primaryDamage = isFlying and 77 or 90
+		if damageTower(target, primaryDamage) then
 			table.insert(towersToKill, target)
 		end
 
@@ -254,8 +248,8 @@ local function doAirStrike(enemy, state)
 				local dist = (otherTower.PrimaryPart.Position - primaryPos).Magnitude
 				if dist <= AIRSTRIKE_SPLASH_RADIUS then
 					local otherFlying = otherTower.Config:FindFirstChild("Flying") ~= nil
-					local splashPct = otherFlying and 0.08 or 0.30
-					if damageTower(otherTower, splashPct) then
+					local splashDamage = otherFlying and 8 or 30
+					if damageTower(otherTower, splashDamage) then
 						table.insert(towersToKill, otherTower)
 					end
 				end
@@ -315,7 +309,7 @@ local function doStomp(enemy, state)
 			if config and hrp and not (config:FindFirstChild("Flying") and config.Flying.Value) then
 				local dist = (hitbox.Position - hrp.Position).Magnitude
 				if dist < STOMP_RADIUS then
-					local died = damageTower(tower, 0.10)
+					local died = damageTower(tower, 10)
 					-- Stun regardless of death
 					local stun = config:FindFirstChild("Stunned")
 					if stun then

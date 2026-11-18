@@ -36,7 +36,7 @@ function Marksman.new(enemy)
 				end
 			end
 			local deathWish = workspace.Info.Modifiers['Death Wish'].Value
-			local damage = math.round(target.Config.Health.MaxHealth.Value * (if deathWish then 0.5 else 0.4))
+			local damage = if deathWish then 50 else 40
 			return Sequence.Run({
 				Active = active,
 				ValidTarget = function() return Targeting.Valid(target, Towers) end,

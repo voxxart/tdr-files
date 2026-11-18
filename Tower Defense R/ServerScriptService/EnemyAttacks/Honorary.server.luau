@@ -220,14 +220,13 @@ local function killTower(tower, state)
 	task.defer(TOWERDEATH_MOD.KillTower, tower, plr or owner)
 end
 
-local function damageTowerPercent(tower, pct, state)
+local function damageTowerFlat(tower, amount, state)
 	if not isValidTower(tower, state) then return end
 
 	local c = TowerCache[tower]
 	local hp = c.healthValue
-	local max = c.maxHealth
 
-	hp.Value = math.max(0, hp.Value - (max.Value * pct))
+	hp.Value = math.max(0, hp.Value - amount)
 
 	if hp.Value <= 0 then
 		killTower(tower, state)
@@ -459,7 +458,7 @@ function doSlam(boss, state)
 		end
 
 		for _, t in ipairs(victims) do
-			damageTowerPercent(t, 1, state)
+			damageTowerFlat(t, 100, state)
 		end
 	end
 
@@ -491,7 +490,7 @@ function doStomp(boss, state)
 			local c = getTowerCache(t)
 			local hrp = c.hrp
 			if hrp and distSq(hrp.Position, hitbox.Position) <= STOMP_RADIUS_SQ then
-				damageTowerPercent(t, 0.1, state)
+				damageTowerFlat(t, 10, state)
 				local config = t.Config
 				local stunned = config:FindFirstChild("Stunned")
 				if stunned then

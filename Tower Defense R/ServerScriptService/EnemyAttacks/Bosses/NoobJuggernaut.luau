@@ -198,11 +198,10 @@ local function schedule(enemy, s, minCd, maxCd)
 	s.nextT = Match.Now() + s.rng:NextNumber(minCd, maxCd)
 end
 
-local function damageTower(tower, percent)
+local function damageTower(tower, amount)
 	if not isValidTower(tower) then return end
 	local hv = tower.Config.Health.HealthValue
-	local maxH = tower.Config.Health.MaxHealth
-	hv.Value = math.round(hv.Value - maxH.Value * percent)
+	hv.Value = math.max(0, hv.Value - amount)
 
 	if hv.Value <= 0 then
 		local ownerName = tower.Config.Owner.Value
@@ -219,7 +218,7 @@ local function applyDOT(tower)
 	task.spawn(function()
 		for _ = 1, ticks do
 			if not tower or not tower.Parent then return end
-			damageTower(tower, 0.05)
+			damageTower(tower, 5)
 			task.wait(tickInterval)
 		end
 	end)
@@ -250,7 +249,7 @@ Behaviors.NoobJuggernaut = function(enemy, s)
 	MOB_MOD.FacePart(enemy, target.PrimaryPart, 5/gs())
 
 	-- main tower damage
-	damageTower(target, 0.025)
+	damageTower(target, 2.5)
 	applyDOT(target)
 
 	-- splash damage (front-only)
@@ -272,7 +271,7 @@ Behaviors.NoobJuggernaut = function(enemy, s)
 
 			local angle = math.deg(math.acos(math.clamp(dot, -1, 1)))
 			if angle <= coneAngle then
-				damageTower(otherTower, 0.025)
+				damageTower(otherTower, 2.5)
 				applyDOT(otherTower)
 			end
 		end

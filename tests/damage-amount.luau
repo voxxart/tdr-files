@@ -1,9 +1,10 @@
 local Amount = require('../Tower Defense R/ServerScriptService/Simulation/DamageAmount')
-assert(Amount.Percent(100, 100, 0.4, false) == 40)
-assert(Amount.Percent(100, 100, 0.5, false) == 50)
--- Executioner rounds remaining health, unlike the other attacks. At half
--- boundaries these differ; preserve the existing balance calculation.
-assert(Amount.Percent(100, 10, 0.15, true) == 1)
-assert(Amount.Percent(100, 10, 0.15, false) == 2)
-assert(Amount.Percent(50.25, 101, 0.2, true) == 20.25)
-print('Damage calculation checks passed: percentages and legacy remaining-health rounding')
+assert(Amount.Flat(12.5) == 12.5)
+assert(Amount.Flat(3.13) == 3.13)
+assert(Amount.Flat(100) == 100)
+assert(Amount.Flat(-10) == 0)
+assert(Amount.Flat(nil) == 0)
+assert(Amount.Flat('20') == 0)
+assert(Amount.Flat(0 / 0) == 0)
+assert(Amount.Flat(math.huge) == 0)
+print('Flat damage preserves fractional HP and rejects invalid damage')

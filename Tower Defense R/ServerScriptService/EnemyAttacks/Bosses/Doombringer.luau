@@ -54,12 +54,12 @@ local STOMP_DURATION = 2
 local MINIGUN_CHANNEL = 5
 local DOT_DURATION = 5
 local DOT_TICK = 0.5
-local DOT_PERCENT = 0.05
-local MINIGUN_DIRECT_PERCENT 
+local DOT_DAMAGE = 5
+local MINIGUN_DIRECT_DAMAGE
 if workspace.Info.Modifiers["Death Wish"].Value == true then 
-	MINIGUN_DIRECT_PERCENT = 0.0313
+	MINIGUN_DIRECT_DAMAGE = 3.13
 else
-	MINIGUN_DIRECT_PERCENT = 0.025
+	MINIGUN_DIRECT_DAMAGE = 2.5
 end
 local MINIGUN_SPLASH_RADIUS = 5
 local MINIGUN_CONE_ANGLE = 20
@@ -270,26 +270,11 @@ local function killTower(tower, state)
 	scope:KillTower(tower, ownerPlayer or ownerName)
 end
 
-local function damageTowerFlat(tower, amount)
-	if not isValidTower(tower) then return false end
-
-	local health = tower.Config.Health.HealthValue
-	health.Value -= amount
-
-	if health.Value <= 0 then
-		killTower(tower)
-		return true
-	end
-
-	return false
-end
-
-local function damageTowerPercent(tower, percent, state)
+local function damageTowerFlat(tower, amount, state)
 	if not isValidTower(tower, state) then return false end
 
 	local health = tower.Config.Health.HealthValue
-	local maxHealth = tower.Config.Health.MaxHealth
-	health.Value = math.round(health.Value - (maxHealth.Value * percent))
+	health.Value = math.max(0, health.Value - amount)
 
 	if health.Value <= 0 then
 		killTower(tower, state)
@@ -310,7 +295,7 @@ local function startDot(state, tower)
 		for _ = 1, ticks do
 			if not alive(state.boss) then break end
 			if not isValidTower(tower) then break end
-			damageTowerPercent(tower, DOT_PERCENT)
+			damageTowerFlat(tower, DOT_DAMAGE)
 			task.wait(DOT_TICK)
 		end
 		state.activeDots[tower] = nil
@@ -626,7 +611,7 @@ local function doStomp(boss, state)
 							newStun.Parent = config
 						end
 
-						damageTowerPercent(tower, 0.1)
+						damageTowerFlat(tower, 10)
 					end
 				end
 			end
@@ -648,7 +633,7 @@ local function doMinigun(boss, state)
 
 		MOB_MOD.FacePart(boss, target.PrimaryPart, 5 / getGameSpeed())
 
-		damageTowerPercent(target, MINIGUN_DIRECT_PERCENT)
+		damageTowerFlat(target, MINIGUN_DIRECT_DAMAGE)
 		startDot(state, target)
 
 		local enemyOrigin = boss:FindFirstChild("HumanoidRootPart") and boss.HumanoidRootPart.Position
@@ -668,7 +653,7 @@ local function doMinigun(boss, state)
 						if dot > 0 then
 							local angle = math.deg(math.acos(math.clamp(dot, -1, 1)))
 							if angle <= MINIGUN_CONE_ANGLE then
-								damageTowerPercent(otherTower, MINIGUN_DIRECT_PERCENT)
+								damageTowerFlat(otherTower, MINIGUN_DIRECT_DAMAGE)
 								startDot(state, otherTower)
 							end
 						end
