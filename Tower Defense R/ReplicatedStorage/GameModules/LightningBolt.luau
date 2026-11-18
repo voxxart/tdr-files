@@ -26,8 +26,11 @@ BoltPart.Color = Color3.new(1, 1, 1)
 BoltPart.Transparency = 1
 
 local PartCache = require(script.Parent.PartCache:WaitForChild("PartCache"))
-local LightningCache = PartCache.new(BoltPart, PARTS_IN_CACHE)
-LightningCache:SetCacheParent(parent)
+-- Keep unused geometry outside Workspace so the cache's far-away transforms
+-- never enter the renderer, even during checkout/return on a busy frame.
+local cacheStorage = Instance.new("Folder")
+cacheStorage.Name = "LightningCacheStorage"
+local LightningCache = PartCache.new(BoltPart, PARTS_IN_CACHE, cacheStorage)
 
 --*
 
@@ -75,6 +78,7 @@ function LightningBolt.new(Attachment0, Attachment1, PartCount)
 
 	--Bolt Appearance Properties
 
+	self.Static = false --Opt-in snapshot geometry: build once, then only update opacity.
 	self.Enabled = true --Hides bolt without removing any parts when false
 	self.Attachment0, self.Attachment1 = Attachment0, Attachment1 --Bolt originates from Attachment0 and ends at Attachment1
 	self.CurveSize0, self.CurveSize1 = 0, 0 --Works similarly to roblox beams. See https://dk135eecbplh9.cloudfront.net/assets/blt160ad3fdeadd4ff2/BeamCurve1.png
@@ -140,6 +144,8 @@ function LightningBolt.new(Attachment0, Attachment1, PartCount)
 	for i = 1, PartCount do
 		self._Parts[i] = LightningCache:GetPart()
 		self._Parts[i].Transparency = 1
+		self._Parts[i].CFrame = CFrame.new()
+		self._Parts[i].Parent = parent
 	end
 
 	self._PartsHidden = false
@@ -162,6 +168,7 @@ function LightningBolt:Destroy()
 		local part = self._Parts[i]
 		-- Hide before PartCache teleports the part to its distant storage position.
 		part.Transparency = 1
+		part.Parent = cacheStorage
 		LightningCache:ReturnPart(part)
 	end
 	table.clear(self._Parts)
@@ -292,6 +299,21 @@ RunService.Heartbeat:Connect(function()
 
 	for _, ThisBranch in pairs(ActiveBranches) do
 		if ThisBranch.Enabled == true then
+			if ThisBranch.Static and ThisBranch._StaticRendered then
+				local elapsed = clock() - ThisBranch._StartT
+				local lifetime = ThisBranch.StaticLifetime or (ThisBranch.PulseLength + 1) / ThisBranch.PulseSpeed
+				if elapsed >= lifetime then
+					ThisBranch:Destroy()
+				else
+					for i, part in ThisBranch._Parts do
+						local opacity = ThisBranch.OpacityProfileFunction(i / #ThisBranch._Parts, elapsed,
+							ThisBranch.PulseSpeed, ThisBranch.PulseLength, ThisBranch.FadeLength,
+							1 - ThisBranch.MaxTransparency, 1 - ThisBranch.MinTransparency)
+						part.Transparency = if ThisBranch._StaticVisible[i] then 1 - math.clamp(opacity, 0, 1) else 1
+					end
+				end
+				continue
+			end
 			ThisBranch._PartsHidden = false
 
 			--Extract important variables
@@ -373,6 +395,11 @@ RunService.Heartbeat:Connect(function()
 					ThisBranch:_UpdateColor(BPart, PercentAlongBolt, TimePassed)
 
 					PrevPoint, bezier0 = NextPoint, bezier1
+				end
+				if ThisBranch.Static then
+					ThisBranch._StaticRendered = true
+					ThisBranch._StaticVisible = {}
+					for i, part in Parts do ThisBranch._StaticVisible[i] = part.Transparency < 1 end
 				end
 			else
 				ThisBranch:Destroy()

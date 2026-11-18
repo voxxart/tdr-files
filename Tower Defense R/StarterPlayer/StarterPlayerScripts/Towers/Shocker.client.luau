@@ -25,9 +25,15 @@ local function getHitPos(model)
 	return hit.Position
 end
 
+local function validPosition(position)
+	return position.X == position.X and position.Y == position.Y and position.Z == position.Z
+		and math.abs(position.X) < 100000 and math.abs(position.Y) < 100000 and math.abs(position.Z) < 100000
+end
+
 local function createBolt(startPos, endPos, low)
+	if not validPosition(startPos) or not validPosition(endPos) then return end
 	local distance = (endPos - startPos).Magnitude
-	if distance < 0.01 then return end
+	if distance < 0.01 or distance > 512 then return end
 	local count = math.clamp(math.ceil(distance / 2), 5, if low then 8 else 12)
 	if usedParts + count > MAX_PARTS then return end
 	-- Snapshot endpoints need no Parts or Attachments. The module accepts these tables.
@@ -35,6 +41,8 @@ local function createBolt(startPos, endPos, low)
 	local bolt = LightningBolt.new(
 		{WorldPosition = startPos, WorldAxis = axis},
 		{WorldPosition = endPos, WorldAxis = axis}, count)
+	bolt.Static = true
+	bolt.StaticLifetime = LIFETIME
 	bolt.Color = COLOR
 	bolt.ColorOffsetSpeed = 0
 	bolt.AnimationSpeed = 0

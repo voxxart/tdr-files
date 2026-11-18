@@ -22,7 +22,7 @@ local function node(kind, children)
 end
 local function typeof(n) return if type(n)=='table' and n.Kind then 'Instance' else type(n) end
 local function pos(x)
- return setmetatable({X=x},{__sub=function(a,b) return {Magnitude=math.abs(a.X-b.X),Unit={}} end})
+ return setmetatable({X=x,Y=0,Z=0},{__sub=function(a,b) return {Magnitude=math.abs(a.X-b.X),Unit={}} end})
 end
 local bolts={}
 local Lightning={new=function(a,b,count)
@@ -50,6 +50,7 @@ event:Fire(tower,chain)
 assert(#bolts==8,'must render all eight links')
 for i,b in bolts do
  assert(b.AnimationSpeed==0 and b.ColorOffsetSpeed==0)
+ assert(b.Static==true and b.StaticLifetime==0.16)
  assert(b.MinThicknessMultiplier==b.MaxThicknessMultiplier)
  assert(b.Start.WorldPosition.X==(i-1)*10 and b.Finish.WorldPosition.X==i*10)
  assert(b.OpacityProfileFunction(0.5,0)==1)
@@ -61,6 +62,14 @@ for _,b in bolts do used+=b.Count end
 assert(used<=768,'budget exceeded')
 now=1; hbSignal:Fire()
 for _,b in bolts do assert(b.Destroyed,'expired bolt leaked') end
+local countBeforeInvalid=#bolts
+local old=chain[1].Hitbox.Position
+chain[1].Hitbox.Position=pos(10000)
+event:Fire(tower,{chain[1]})
+chain[1].Hitbox.Position=pos(0/0)
+event:Fire(tower,{chain[1]})
+assert(#bolts==countBeforeInvalid,'invalid or oversized bolt rendered')
+chain[1].Hitbox.Position=old
 local before=#bolts
 quality='Low'; event:Fire(tower,chain)
 assert(#bolts==before+8,'budget did not recover')

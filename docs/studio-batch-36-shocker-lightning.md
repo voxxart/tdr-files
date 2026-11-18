@@ -13,3 +13,9 @@ Test a single target and a fully upgraded chain, High/Low VFX, repeated attacks,
 - [ ] Replace the shared **ModuleScript** `LightningBolt` too, using `ReplicatedStorage/GameModules/LightningBolt.luau` from this repository. Replace the copy your game currently uses (`ReplicatedStorage.LightningBolt` takes precedence); keep its existing PartCache dependency alongside it.
 
 The shared module now hides parts before returning them to distant cache storage, tracks active bolts by identity instead of sparse-array length, makes destruction safe to repeat, and hides zero-length or fully faded segments before computing their orientation. These fixes also apply to other effects using that same module. Test Shocker and Reaper together in Studio, including repeated hits and effect expiry.
+
+### Follow-up for recurring graphics glitches
+
+Replace both **ModuleScript** `LightningBolt` (the copy used by your game) and **LocalScript** `StarterPlayer.StarterPlayerScripts.Towers.Shocker`, then restart the play session. Cached lightning parts now stay in an unparented folder outside Workspace. Checkout resets their transform while hidden before attaching them to Terrain; return removes them from Workspace before the cache teleports them. Shocker also rejects nonfinite/out-of-world endpoints and links longer than 512 studs. This bounds visual geometry without affecting damage. Automated checks cover cache isolation and invalid/oversized links; the reported graphics glitch needs Studio reproduction to confirm resolution.
+
+Shocker now opts into static geometry: the module calculates its segment shapes and colors only on the first update, then updates transparency until expiry. Other towers keep the existing animated behavior. This reduces repeated geometry work, but does not establish the cause of the reported temporary scene-quality drop. Replace both scripts listed above for this change.

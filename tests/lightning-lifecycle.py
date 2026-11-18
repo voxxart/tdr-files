@@ -18,6 +18,7 @@ end
 function cache:ReturnPart(p)
  assert(self.Owned[p],'double return')
  assert(p.Transparency==1,'visible geometry teleported into distant cache')
+ assert(p.Parent and p.Parent.Name=='LightningCacheStorage','cached geometry remains in Workspace')
  self.Owned[p]=nil; table.insert(self.Free,p)
 end
 function cache:SetCacheParent() end
@@ -25,7 +26,7 @@ local game={GetService=function(_,k) return if k=='Workspace' then {Terrain={}} 
 local Instance={new=function() return {} end}
 local Enum={Material={Neon=1}}
 local Color3={new=function() return {} end}
-local CFrame={lookAt=function() return {inverse=function(self) return self end} end}
+local CFrame={new=function() return {} end,lookAt=function() return {inverse=function(self) return self end} end}
 local vector
 vector=function(x,y,z)
  return setmetatable({X=x or 0,Y=y or 0,Z=z or 0}, {__mul=function(a,b) return vector(a.X*b,a.Y*b,a.Z*b) end, __add=function(a,b) return vector(a.X+b.X,a.Y+b.Y,a.Z+b.Z) end, __sub=function(a,b)
@@ -35,7 +36,7 @@ vector=function(x,y,z)
 end
 local Vector3={new=vector}
 local script={Parent={PartCache={WaitForChild=function() return {} end}}}
-local require=function() return {new=function() return cache end} end
+local require=function() return {new=function(_,_,storage) assert(storage.Name=='LightningCacheStorage' and storage.Parent==nil,'cache must be outside Workspace'); return cache end} end
 local Lightning=(function()
 '''+source+r'''
 end)()
@@ -55,6 +56,19 @@ env.debug=debug
 heartbeat.fn()
 assert(next(cache.Owned)==nil,'active bolt registry lost a bolt')
 for _,b in bolts do b:Destroy() end -- repeat destroy must be harmless
+local frozen=Lightning.new(anchor,anchor,6)
+frozen.Static=true; frozen.StaticLifetime=1000
+frozen.OpacityProfileFunction=function() return 1 end
+local geometryCalls=0
+function frozen:_UpdateGeometry(part) geometryCalls+=1; part.Transparency=0 end
+function frozen:_UpdateColor() end
+heartbeat.fn()
+assert(geometryCalls==6 and frozen._StaticRendered,'static bolt not built')
+heartbeat.fn(); heartbeat.fn()
+assert(geometryCalls==6,'static bolt geometry rebuilt every frame')
+frozen._StartT=-100000
+heartbeat.fn()
+assert(frozen._Destroyed,'static lifetime did not expire')
 local bolt=Lightning.new(anchor,anchor,2)
 bolt.OpacityProfileFunction=function() return 1 end
 local part={Transparency=0}
