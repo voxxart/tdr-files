@@ -6,6 +6,7 @@ Photon.__index = Photon
 Photon.DefaultColor = Color3.fromRGB(100, 210, 255)
 Photon.MaxActive = 48
 local DURATION = 0.18
+local IMPACT_DIAMETER = 1.75
 -- Immediate full-length strike, then a fast energy decay. No travelling projectile
 -- or repeated flashes: opacity only decreases throughout the shot.
 local function coreOpacity(_, elapsed)
@@ -66,7 +67,7 @@ function Photon:Step(dt)
    self.Active[i]=self.Active[#self.Active]; self.Active[#self.Active]=nil
   else
    local alpha=record.Elapsed/DURATION
-   local size=0.18+0.85*alpha
+   local size=0.18+(IMPACT_DIAMETER-0.18)*alpha
    record.Impact.Size=Vector3.new(size,size,size)
    record.Impact.Transparency=0.2+0.8*alpha
   end
