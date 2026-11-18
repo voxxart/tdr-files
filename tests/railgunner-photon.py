@@ -61,23 +61,20 @@ local pool=Photon.new(workspace)
 local color=Color3.fromRGB(255,80,130)
 assert(pool:Emit(vec(0,0,0),vec(10,0,0),color,false))
 local b=bolts[#bolts]
-assert(b.Count==1 and b.MaxRadius==0 and b.Static and b.Color==color)
+assert(b.Count==4 and b.MaxRadius>0 and b.MaxRadius<=0.14 and b.Jagged and b.Static and b.Color==color)
 assert(pool.Active[1].Impact.Color==color)
-local core=pool.Active[1].Bolt
-assert(core.Color.G>color.G and core.Thickness<b.Thickness,'missing bright narrow core')
-for _,layer in {core,b} do
- local previous=layer.OpacityProfileFunction(0.5,0)
- assert(previous>0,'strike must appear immediately')
- for i=1,18 do
-  local opacity=layer.OpacityProfileFunction(0.5,i*0.01)
-  assert(opacity<=previous,'beam flickered or faded in'); previous=opacity
- end
- assert(previous==0)
+assert(b.Thickness==0.18 and pool.Active[1].Glow==nil,'original single-beam style changed')
+local previous=b.OpacityProfileFunction(0.5,0)
+assert(previous==1,'strike must appear immediately')
+for i=1,18 do
+ local opacity=b.OpacityProfileFunction(0.5,i*0.01)
+ assert(opacity<=previous,'beam flickered or faded in'); previous=opacity
 end
+assert(previous==0)
 assert(not pool:Emit(vec(0,0,0),vec(10000,0,0),color,false))
 assert(not pool:Emit(vec(0/0,0,0),vec(10,0,0),color,false))
 for i=1,100 do pool:Emit(vec(0,0,0),vec(10,0,0),color,false) end
-assert(#pool.Active==48 and created==48 and #bolts==96,'unbounded geometry')
+assert(#pool.Active==48 and created==48 and #bolts==48,'unbounded geometry')
 pool:Step(1)
 assert(#pool.Active==0 and #pool.Free==48)
 local count=created
@@ -85,7 +82,7 @@ pool:Emit(vec(0,0,0),vec(10,0,0),color,false)
 assert(created==count,'impact not reused')
 pool:Clear()
 for i=1,100 do pool:Emit(vec(0,0,0),vec(10,0,0),color,true) end
-assert(#pool.Active==16 and pool.Active[1].Glow==nil,'Low VFX should omit glow')
+assert(#pool.Active==16 and pool.Active[1].Bolt.Count==3,'Low VFX should reduce beam segments')
 pool:Destroy();pool:Destroy()
 assert(pool.Folder.Destroyed and pool.Storage.Destroyed)
 modules.PhotonShots=Photon
@@ -97,11 +94,11 @@ local count=#bolts
 tower.Attributes.TowerLevel=3;event:Fire(tower,'Attack',enemy)
 assert(#bolts==count,'lower level fired photon')
 tower.Attributes.TowerLevel=4;event:Fire(tower,'Attack',enemy)
-assert(#bolts==count+2 and bolts[#bolts].Color==color and bolts[#bolts].From.WorldPosition.X==2)
+assert(#bolts==count+1 and bolts[#bolts].Color==color and bolts[#bolts].From.WorldPosition.X==2)
 tower.Attributes.TowerName='Trooper';event:Fire(tower,'Attack',enemy)
-assert(#bolts==count+2,'other tower fired photon')
+assert(#bolts==count+1,'other tower fired photon')
 info.GameRunning.Value=false;info.GameRunning.Changed:Fire()
-assert(bolts[#bolts].Destroyed and bolts[#bolts-1].Destroyed,'match end leaked bolt')
+assert(bolts[#bolts].Destroyed,'match end leaked bolt')
 script.Destroying:Fire()
 print('Photon: level gating, skin color, muzzle, bounded/reused impacts and match cleanup passed')
 '''
