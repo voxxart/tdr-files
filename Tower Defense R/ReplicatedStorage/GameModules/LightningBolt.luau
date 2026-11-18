@@ -139,27 +139,32 @@ function LightningBolt.new(Attachment0, Attachment1, PartCount)
 
 	for i = 1, PartCount do
 		self._Parts[i] = LightningCache:GetPart()
+		self._Parts[i].Transparency = 1
 	end
 
 	self._PartsHidden = false
 	self._DisabledTransparency = 1
 	self._StartT = clock()
 	self._RanNum = math.random() * 100
-	self._RefIndex = #ActiveBranches + 1
-
-	ActiveBranches[self._RefIndex] = self
+	-- Key by identity: removing a bolt cannot make a later creation overwrite another.
+	ActiveBranches[self] = self
 
 	return self
 end
 
 function LightningBolt:Destroy()
-	ActiveBranches[self._RefIndex] = nil
+	if self._Destroyed then return end
+	self._Destroyed = true
+	self.Enabled = false
+	ActiveBranches[self] = nil
 
 	for i = 1, #self._Parts do
-		LightningCache:ReturnPart(self._Parts[i])
+		local part = self._Parts[i]
+		-- Hide before PartCache teleports the part to its distant storage position.
+		part.Transparency = 1
+		LightningCache:ReturnPart(part)
 	end
-
-	self = nil
+	table.clear(self._Parts)
 end
 
 --Calls Destroy() after TimeLength seconds where a dissipating effect takes place in the meantime
@@ -174,6 +179,10 @@ function LightningBolt:DestroyDissipate(TimeLength, Strength)
 	local DissipateLoop
 
 	DissipateLoop = RunService.Heartbeat:Connect(function()
+		if self._Destroyed then
+			DissipateLoop:Disconnect()
+			return
+		end
 		local TimeSinceDissipate = clock() - DissipateStartT
 		self.MinThicknessMultiplier = StartMinThick + (-2 - StartMinThick) * TimeSinceDissipate / TimeLength
 
@@ -226,6 +235,12 @@ function LightningBolt:_UpdateGeometry(
 	Opacity = Thickness > 0 and Opacity or 0
 
 	--Compute + update sizing and orientation of this particular section
+	local length = (NextPoint - PrevPoint).Magnitude
+	if length ~= length or length == math.huge or length < 0.0001
+		or Thickness ~= Thickness or Thickness == math.huge or Thickness <= 0 or Opacity <= 0 then
+		BPart.Transparency = 1
+		return
+	end
 	local contractf = 1 - self.ContractFrom
 	local PartsN = #self._Parts
 	if Opacity > contractf then
