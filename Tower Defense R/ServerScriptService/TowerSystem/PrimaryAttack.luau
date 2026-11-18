@@ -22,6 +22,7 @@ return function(newTower, player, config, targetOverride)
 	end
 
 	local dealtDamage = false
+	local animated = false
 
 	local stunUntil = config:GetAttribute("StunnedUntil")
 	if stunUntil and os_clock() < stunUntil then return end
@@ -53,7 +54,18 @@ return function(newTower, player, config, targetOverride)
 	local mobSnapshot = nil
 
 	if config:FindFirstChild("Splash") then
-		tower.FireSplashProjectile(newTower, target, config)
+		local instant = config:FindFirstChild("InstantSplash")
+		if instant and instant.Value then
+			local hitbox = target:FindFirstChild("Hitbox")
+			if not hitbox then return end
+			local position = hitbox.Position
+			-- Publish the shot before lethal splash can remove the target.
+			animateTowerEvent:FireAllClients(newTower, "Attack", target)
+			animated = true
+			tower.Splash(position, newTower)
+		else
+			tower.FireSplashProjectile(newTower, target, config)
+		end
 	elseif config:FindFirstChild("Shocker") then
 		tower.Shocker(target, newTower, player)
 	else
@@ -151,7 +163,7 @@ return function(newTower, player, config, targetOverride)
 	else
 		tower.FaceTarget(newTower, target, 0)
 	end
-	animateTowerEvent:FireAllClients(newTower, "Attack", target)
+	if not animated then animateTowerEvent:FireAllClients(newTower, "Attack", target) end
 
 	-- NOTE: target destruction is owned by mob.Move / mob.Explode on the server.
 	-- DoAttackLogic must NOT call target:Destroy() to avoid a race condition.

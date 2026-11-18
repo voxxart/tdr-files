@@ -25,7 +25,7 @@ connections[#connections+1]=Rep.Events:WaitForChild('AnimateTower').OnClientEven
  if typeof(target)~='Instance' or not target.Parent then return end
  local weapon=tower:FindFirstChild('Weapon') or tower:FindFirstChild('weapon')
  local handle=weapon and weapon:FindFirstChild('Handle')
- local aim=target:FindFirstChild('HumanoidRootPart') or target.PrimaryPart or target:FindFirstChild('Hitbox')
+ local aim=target:FindFirstChild('Hitbox') or target:FindFirstChild('HumanoidRootPart') or target.PrimaryPart
  if not handle or not handle:IsA('BasePart') or not aim or not aim:IsA('BasePart') then return end
  local barrel=handle:FindFirstChild('Barrel')
  local from=if barrel and barrel:IsA('Attachment') then barrel.WorldPosition else handle.Position

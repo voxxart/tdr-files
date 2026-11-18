@@ -1384,6 +1384,10 @@ return {
 					Range = 35,
 					Firerate = 4.5,
 					MaxHealth = 820,
+
+					Splash = true,
+					InstantSplash = true,
+					SplashRadius = 0.875, -- Matches the photon impact's 1.75-stud diameter.
 				},
 			},
 		},
