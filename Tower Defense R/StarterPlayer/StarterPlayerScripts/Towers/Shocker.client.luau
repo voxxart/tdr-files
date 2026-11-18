@@ -1,159 +1,88 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
-local Debris = game:GetService("Debris")
-
+local RunService = game:GetService("RunService")
+local modules = ReplicatedStorage:WaitForChild("GameModules")
+-- Some places retain the shared lightning package at ReplicatedStorage's root.
+local LightningBolt = require(ReplicatedStorage:FindFirstChild("LightningBolt") or modules:WaitForChild("LightningBolt"))
+local Policy = require(modules:WaitForChild("VFXPolicy"))
 local FXEvent = ReplicatedStorage.Events.Shocker:WaitForChild("LightningBolt")
 
-local camera = Workspace.CurrentCamera
+local LIFETIME = 0.16
+local FADE_TIME = 0.04
+local MAX_PARTS = 768
+local COLOR = Color3.fromRGB(65, 180, 255)
+local active = {}
+local usedParts = 0
+local clock = os.clock
 
-local function getJitteredPoint(a, b, alpha, strength)
-	local pos = a:Lerp(b, alpha)
-
-	local offset = Vector3.new(
-		math.random(-100,100)/100 * strength,
-		math.random(-100,100)/100 * strength,
-		math.random(-100,100)/100 * strength
-	)
-
-	return pos + offset
+local function opacity(_, elapsed)
+	return math.clamp((LIFETIME - elapsed) / FADE_TIME, 0, 1)
 end
 
-------------------------------------------------
--- CREATE ONE BEAM SEGMENT
-------------------------------------------------
-local function createBeam(startPos, endPos, lifetime)
-	local function newPart(pos)
-		local p = Instance.new("Part")
-		p.Anchored = true
-		p.CanCollide = false
-		p.Transparency = 1
-		p.Size = Vector3.zero
-		p.CFrame = CFrame.new(pos)
-		p.Parent = workspace.Terrain
-		return p
-	end
-
-	local p0 = newPart(startPos)
-	local p1 = newPart(endPos)
-
-	local a0 = Instance.new("Attachment", p0)
-	local a1 = Instance.new("Attachment", p1)
-
-	------------------------------------------------
-	-- CORE BEAM (bright center)
-	------------------------------------------------
-	local core = Instance.new("Beam")
-	core.Attachment0 = a0
-	core.Attachment1 = a1
-	core.Width0 = 0.12
-	core.Width1 = 0.12
-	core.LightEmission = 0.8
-	core.LightInfluence = 0.8
-	core.Brightness = 22
-	core.FaceCamera = true
-	core.Color = ColorSequence.new(Color3.fromRGB(120, 220, 255))
-	core.Transparency = NumberSequence.new(0)
-	core.TextureSpeed = 2
-	core.TextureLength = 1
-	core.Parent = p0
-
-	------------------------------------------------
-	-- GLOW BEAM (fatter aura)
-	------------------------------------------------
-	local glow = Instance.new("Beam")
-	glow.Attachment0 = a0
-	glow.Attachment1 = a1
-	glow.Width0 = 0.27
-	glow.Width1 = 0.27
-	core.LightEmission = 0.8
-	core.LightInfluence = 0.8
-	core.Brightness = 22
-	glow.FaceCamera = true
-	glow.Color = ColorSequence.new(Color3.fromRGB(0, 85, 255))
-	glow.Transparency = NumberSequence.new(0.6)
-	glow.Parent = p0
-
-	------------------------------------------------
-	-- cleanup
-	------------------------------------------------
-	game:GetService("Debris"):AddItem(p0, lifetime)
-	game:GetService("Debris"):AddItem(p1, lifetime)
-end
-
-------------------------------------------------
--- GET SAFE POSITION
-------------------------------------------------
 local function getHitPos(model)
-	if not model then return nil end
-
+	if typeof(model) ~= "Instance" or not model.Parent then return nil end
 	local hit = model:FindFirstChild("Hitbox")
 	if not hit or not hit:IsA("BasePart") then return nil end
-	if not hit.Parent then return nil end
-
-	local humanoid = model:FindFirstChildOfClass("Humanoid")
-	if humanoid and humanoid.Health <= 0 then return nil end
-
 	return hit.Position
 end
 
-------------------------------------------------
--- PLAY CHAIN FX
-------------------------------------------------
-local function playChain(towerModel, chain)
-	if not towerModel or not chain or #chain == 0 then return end
-
-	local weapon = towerModel:FindFirstChild("Weapon")
-	local handle = weapon and weapon:FindFirstChild("Handle")
-	local startAttachment = handle and handle:FindFirstChild("Lightning")
-	if not startAttachment then return end
-
-	local startPos = startAttachment.WorldPosition
-
-	local MAX_CHAIN = 5
-	local SEGMENTS = 3 -- more = smoother lightning
-	local lifetime = 0.12
-
-	local prevPos = startPos
-
-	for i = 1, math.min(#chain, MAX_CHAIN) do
-		local endPos = getHitPos(chain[i])
-		if not endPos then break end
-
-		------------------------------------------------
-		-- BUILD LIGHTNING PATH (CURVED CHAIN)
-		------------------------------------------------
-		local points = { prevPos }
-
-		for s = 1, SEGMENTS - 1 do
-			local alpha = s / SEGMENTS
-			table.insert(points, getJitteredPoint(prevPos, endPos, alpha, 0.15))
-		end
-
-		table.insert(points, endPos)
-
-		------------------------------------------------
-		-- DRAW SEGMENTS
-		------------------------------------------------
-		for p = 1, #points - 1 do
-			local jitter = Vector3.new(
-				math.random(-8,8)/100,
-				math.random(-8,8)/100,
-				math.random(-8,8)/100
-			)
-
-			createBeam(points[p] + jitter, points[p+1] + jitter, lifetime * 1.1)
-		end
-
-		------------------------------------------------
-		-- UPDATE CHAIN STEP
-		------------------------------------------------
-		prevPos = endPos
-	end
+local function createBolt(startPos, endPos, low)
+	local distance = (endPos - startPos).Magnitude
+	if distance < 0.01 then return end
+	local count = math.clamp(math.ceil(distance / 2), 5, if low then 8 else 12)
+	if usedParts + count > MAX_PARTS then return end
+	-- Snapshot endpoints need no Parts or Attachments. The module accepts these tables.
+	local axis = (endPos - startPos).Unit
+	local bolt = LightningBolt.new(
+		{WorldPosition = startPos, WorldAxis = axis},
+		{WorldPosition = endPos, WorldAxis = axis}, count)
+	bolt.Color = COLOR
+	bolt.ColorOffsetSpeed = 0
+	bolt.AnimationSpeed = 0
+	bolt.Frequency = 1
+	bolt.MinRadius = 0
+	bolt.MaxRadius = math.min(0.65, distance * 0.07)
+	bolt.Thickness = 0.13
+	bolt.MinThicknessMultiplier = 1
+	bolt.MaxThicknessMultiplier = 1
+	bolt.ContractFrom = 2
+	bolt.OpacityProfileFunction = opacity
+	usedParts += count
+	table.insert(active, {Bolt = bolt, Parts = count, Expires = clock() + LIFETIME})
 end
 
-------------------------------------------------
--- EVENT
-------------------------------------------------
-FXEvent.OnClientEvent:Connect(function(towerModel, hitTargets)
-	playChain(towerModel, hitTargets)
+local eventConnection = FXEvent.OnClientEvent:Connect(function(towerModel, chain)
+	if typeof(towerModel) ~= "Instance" or not towerModel.Parent or type(chain) ~= "table" then return end
+	local weapon = towerModel:FindFirstChild("Weapon")
+	local handle = weapon and weapon:FindFirstChild("Handle")
+	local origin = handle and handle:FindFirstChild("Lightning")
+	if not origin or not origin:IsA("Attachment") then return end
+	local previous = origin.WorldPosition
+	local low = Policy.Quality() == "Low"
+	for _, target in ipairs(chain) do
+		local position = getHitPos(target)
+		if not position then break end
+		createBolt(previous, position, low)
+		previous = position
+	end
+end)
+
+-- One cleanup loop for every shot; Destroy returns geometry to the shared cache.
+local heartbeat = RunService.Heartbeat:Connect(function()
+	local now = clock()
+	for i = #active, 1, -1 do
+		local record = active[i]
+		if now >= record.Expires then
+			record.Bolt:Destroy()
+			usedParts -= record.Parts
+			active[i] = active[#active]
+			active[#active] = nil
+		end
+	end
+end)
+script.Destroying:Connect(function()
+	eventConnection:Disconnect()
+	heartbeat:Disconnect()
+	for _, record in active do record.Bolt:Destroy() end
+	table.clear(active)
+	usedParts = 0
 end)
