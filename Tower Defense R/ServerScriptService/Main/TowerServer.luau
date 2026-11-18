@@ -1321,6 +1321,15 @@ function tower.Upgrade(player, model)
 		)
 
 		setTowerLevel(model, config, nextLevel)
+		-- Skin-authored colors survive upgrades; only supply a missing default.
+		if getCanonicalTowerName(model) == "Railgunner"
+			and not TowerStats.GetUpgrade("Railgunner", nextLevel + 1)
+			and not config:FindFirstChild("PhotonColor") then
+			local color = Instance.new("Color3Value")
+			color.Name = "PhotonColor"
+			color.Value = Color3.fromRGB(100, 210, 255)
+			color.Parent = config
+		end
 		runtime.Level = nextLevel
 		local totalSpent = (runtime.TotalSpent or 0) + rawCost
 		setTotalSpent(model, config, runtime, totalSpent)
