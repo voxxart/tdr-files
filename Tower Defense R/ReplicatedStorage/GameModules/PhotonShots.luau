@@ -12,7 +12,7 @@ local function coreOpacity(_, elapsed)
  return math.clamp((DURATION-elapsed)/0.04,0,1) * (0.2+0.8*math.exp(-elapsed/0.055))
 end
 local function glowOpacity(_, elapsed)
- return math.clamp((DURATION-elapsed)/0.06,0,1) * (0.12+0.48*math.exp(-elapsed/0.025))
+ return math.clamp((DURATION-elapsed)/0.06,0,1) * (0.08+0.4*math.exp(-elapsed/0.025))
 end
 local function makeLayer(from,to,direction,color,width,profile)
  local bolt=Lightning.new({WorldPosition=from,WorldAxis=direction},{WorldPosition=to,WorldAxis=direction},1)
@@ -39,7 +39,7 @@ function Photon:Emit(from,to,color,low)
  if distance<0.01 or distance>512 then return false end
  local direction=delta.Unit
  local bolt=makeLayer(from,to,direction,if low then color else color:Lerp(Color3.new(1,1,1),0.65),0.075,coreOpacity)
- local glow=if low then nil else makeLayer(from,to,direction,color,0.34,glowOpacity)
+ local glow=if low then nil else makeLayer(from,to,direction,color,0.28,glowOpacity)
  local impact=table.remove(self.Free)
  if not impact then
   impact=Instance.new('Part'); impact.Name='PhotonImpact'
