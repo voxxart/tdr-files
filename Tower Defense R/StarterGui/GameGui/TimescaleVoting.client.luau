@@ -11,16 +11,26 @@ local no=area:WaitForChild('No'):WaitForChild('Button')
 local title=frame:WaitForChild('Title')
 local info=workspace:WaitForChild('Info')
 local remote=Rep:WaitForChild('Functions'):WaitForChild('VoteTimescale')
-local current,pendingId
+local current,pendingId,pendingChoice
 local alive=true
 local connections={}
 frame.Visible=false
+local neutral=Color3.fromRGB(57,57,57)
+local function outline(button,color)
+ local stroke=button:FindFirstChildWhichIsA('UIStroke')
+ if stroke then stroke.Color=color end
+end
+outline(yes,neutral);outline(no,neutral)
 local function render()
  if not alive then return end
  local now=workspace:GetServerTimeNow()
  local active=current and current.Active and now<current.Expires
  frame.Visible=active==true
  if not current then return end
+ local choice=current.Choices and current.Choices[tostring(player.UserId)]
+ if choice==nil and pendingId==current.Id then choice=pendingChoice end
+ outline(yes,if choice==true then Color3.fromRGB(0,255,0) else neutral)
+ outline(no,if choice==false then Color3.fromRGB(255,0,0) else neutral)
  local voted=current.Choices and current.Choices[tostring(player.UserId)]~=nil
  yes.Active=active==true and not voted and pendingId~=current.Id
  no.Active=yes.Active
@@ -40,7 +50,7 @@ local function update()
  if type(encoded)=='string' then
   local ok,value=pcall(Http.JSONDecode,Http,encoded)
   if ok and type(value)=='table' then
-   if not current or current.Id~=value.Id then pendingId=nil end
+   if not current or current.Id~=value.Id then pendingId=nil;pendingChoice=nil end
    current=value
   end
  end
@@ -49,9 +59,9 @@ end
 local function cast(choice)
  if not current or not current.Active or pendingId==current.Id then return end
  if current.Choices and current.Choices[tostring(player.UserId)]~=nil then return end
- local id=current.Id;pendingId=id;render()
+ local id=current.Id;pendingId=id;pendingChoice=choice;render()
  local ok,accepted=pcall(remote.InvokeServer,remote,id,choice)
- if (not ok or not accepted) and pendingId==id then pendingId=nil end
+ if (not ok or not accepted) and pendingId==id then pendingId=nil;pendingChoice=nil end
  render()
 end
 connections[#connections+1]=yes.Activated:Connect(function() cast(true) end)
