@@ -2,7 +2,7 @@
 from pathlib import Path
 import subprocess,tempfile
 root=Path(__file__).resolve().parents[1]
-paths={'service':'ServerScriptService/EventCurrencySystem/Service.luau','wallet':'ServerScriptService/EventCurrencySystem/Wallet.luau','quota':'ServerScriptService/EventCurrencySystem/Quota.luau','store':'ServerScriptService/EventCurrencySystem/DropStore.luau','assets':'ReplicatedStorage/GameModules/EventCurrencyAssets.luau','datastore':'ServerScriptService/Datastore.server.luau'}
+paths={'purchase':'ServerScriptService/TimescaleSystem/Purchase.luau','service':'ServerScriptService/EventCurrencySystem/Service.luau','wallet':'ServerScriptService/EventCurrencySystem/Wallet.luau','quota':'ServerScriptService/EventCurrencySystem/Quota.luau','store':'ServerScriptService/EventCurrencySystem/DropStore.luau','assets':'ReplicatedStorage/GameModules/EventCurrencyAssets.luau','datastore':'ServerScriptService/Datastore.server.luau'}
 code='local sources={}\n'+'\n'.join('sources.'+k+'=[====['+(root/'Tower Defense R'/v).read_text()+']====]' for k,v in paths.items())+r'''
 local function signal()
  local s={Entries={}}
@@ -55,7 +55,7 @@ local profiles={[1]={Coins=100,EventCurrency=10},[2]={Coins=200}}
 local writes=0; local stored={}
 local db={GetAsync=function(_,id) return profiles[id] end,UpdateAsync=function(_,id,fn) writes+=1; stored[id]=fn() end}
 local loaded={config=config,match=match,rewards={ApplyXP=function(amount) return amount end}}
-local game={ReplicatedStorage=rep,ServerScriptService={Simulation={MatchService='match',MatchRewards='rewards'},EventCurrencySystem={Wallet='wallet'}}}
+local game={ReplicatedStorage=rep,ServerScriptService={TimescaleSystem={Purchase='purchase'},Simulation={MatchService='match',MatchRewards='rewards'},EventCurrencySystem={Wallet='wallet'}}}
 function game:GetService(key)
  if key=='ReplicatedStorage' then return rep elseif key=='Players' then return players elseif key=='RunService' then return {Heartbeat=beat,IsStudio=function() return true end}
  elseif key=='DataStoreService' then return {GetDataStore=function() return db end} end
@@ -145,6 +145,15 @@ p2.Character.HumanoidRootPart.Position=vec(9.9,8,0); step(0.05); assert(profiles
 p2.Character.HumanoidRootPart.Position=vec(10.1,3,0)
 assert(service.TryDrop(vec(0,3,0),map,3)); step(0.2); assert(profiles[2].EventCurrency==before+6,'outside horizontal radius must not credit')
 p2.Character.HumanoidRootPart.Position=vec(10,3,0); step(0.05); assert(profiles[2].EventCurrency==before+9,'boundary entry must credit on the next 20 Hz check')
+-- Purchasing persists the loaded profile without triggering match rewards.
+profiles[2].Gems=800
+local writeCount=writes
+local receipt=functions.PurchaseTimescale.OnServerInvoke(p2,'Purchase')
+assert(receipt.Success and receipt.Saved and profiles[2].Gems==300 and profiles[2].UnlockedTimescale==1)
+assert(writes==writeCount+1 and stored[2].Gems==300 and stored[2].UnlockedTimescale==1)
+assert(not loaded.purchase.Dirty(p2))
+assert(functions.PurchaseTimescale.OnServerInvoke(p2,'Status').Owned)
+assert(functions.PurchaseTimescale.OnServerInvoke(p2,'malicious')==nil)
 print('Event currency server passed: personal claims, duplicate prevention, range/landing checks, caps, pause/expiry, cancellation, zero per-pickup saves, actual datastore load/disconnect persistence')
 '''
 with tempfile.NamedTemporaryFile('w',suffix='.luau') as f:

@@ -14,6 +14,8 @@ local data = {}
 local disconnectSaves = 0
 local EventWallet = require(game.ServerScriptService.EventCurrencySystem.Wallet)
 EventWallet.Bind(function(player) return data[player.UserId] end)
+local TimescalePurchase = require(game.ServerScriptService.TimescaleSystem.Purchase)
+TimescalePurchase.Bind(function(player) return data[player.UserId] end)
 
 ------------------------------------------------
 -- LOAD DATA
@@ -40,6 +42,7 @@ local function LoadData(player)
 			playerData = {
 				Coins = 150,
 				Gems = 0,
+				UnlockedTimescale = 0,
 				Shards = 0,
 				Level = 0,
 				Wins = 0,
@@ -107,6 +110,7 @@ local function LoadData(player)
 
 		data[player.UserId] = playerData
 		EventWallet.Publish(player)
+		TimescalePurchase.Publish(player)
 	else
 		player:Kick("Data failed to load")
 	end
@@ -139,6 +143,7 @@ local rewardLock = {}
 ------------------------------------------------
 local function saveData(player)
 	local currencyVersion = EventWallet.Version(player)
+	local timescaleVersion = TimescalePurchase.Version(player)
 	local playerData = data[player.UserId]
 	if not playerData then return end
 
@@ -473,6 +478,7 @@ local function saveData(player)
 	playerData.Coins += Coins
 	playerData.Exp += Exp
 	playerData.Gems += Gems
+	TimescalePurchase.Publish(player)
 	if Multiplier >= 1 then
 		playerData.Wins += Wins
 		if difficulty == "Easy" then
@@ -518,6 +524,7 @@ local function saveData(player)
 		player:Kick("Data save failed")
 	else
 		EventWallet.MarkSaved(player, currencyVersion)
+		TimescalePurchase.MarkSaved(player, timescaleVersion)
 	end
 end
 
@@ -552,19 +559,50 @@ exitEvent.OnServerEvent:Connect(saveData)
 ------------------------------------------------
 local function saveLoadedCurrency(player)
 	local playerData = data[player.UserId]
-	if not playerData or not EventWallet.Dirty(player) then return true end
+	if not playerData or not (EventWallet.Dirty(player) or TimescalePurchase.Dirty(player)) then return true end
 	local version = EventWallet.Version(player)
+	local timescaleVersion = TimescalePurchase.Version(player)
 	local success, err
 	for attempt=1,3 do
 		success, err = pcall(function()
 			database:UpdateAsync(player.UserId, function() return playerData end)
 		end)
-		if success then EventWallet.MarkSaved(player, version); return true end
+		if success then
+			EventWallet.MarkSaved(player, version)
+			TimescalePurchase.MarkSaved(player, timescaleVersion)
+			return true
+		end
 		task.wait(1)
 	end
-	warn("Event currency save failed:", player.UserId, err)
+	warn("Loaded profile save failed:", player.UserId, err)
 	return false
 end
+
+-- Fixed-price purchase endpoint. Inputs never supply a price, balance or ownership.
+local functions = ReplicatedStorage:WaitForChild("Functions")
+local purchaseRemote = functions:FindFirstChild("PurchaseTimescale")
+if not purchaseRemote then
+	purchaseRemote = Instance.new("RemoteFunction")
+	purchaseRemote.Name = "PurchaseTimescale"
+	purchaseRemote.Parent = functions
+end
+local lastPurchaseRequest = {}
+purchaseRemote.OnServerInvoke = function(player, action)
+	if action ~= "Status" and action ~= "Purchase" then return nil end
+	if action == "Status" then return TimescalePurchase.Publish(player) end
+	local now = os.clock()
+	if lastPurchaseRequest[player] and now - lastPurchaseRequest[player] < 0.5 then
+		return {Success=false, Error="Please wait a moment before trying again."}
+	end
+	lastPurchaseRequest[player] = now
+	local result = TimescalePurchase.Buy(player)
+	if result.Success and result.Changed then
+		-- Save the same loaded profile, without awarding match rewards.
+		result.Saved = saveLoadedCurrency(player)
+	end
+	return result
+end
+Players.PlayerRemoving:Connect(function(player) lastPurchaseRequest[player] = nil end)
 
 game:BindToClose(function()
 	local pendingSaves = 0
@@ -572,6 +610,7 @@ game:BindToClose(function()
 		for _, player in pairs(Players:GetPlayers()) do
 			pendingSaves += 1
 			EventWallet.Close(player)
+			TimescalePurchase.Close(player)
 			task.spawn(function()
 				local ok, err = pcall(saveData, player)
 				if not ok then warn("Shutdown reward save failed:", player.UserId, err) end
@@ -602,12 +641,14 @@ _G.DataStore = {
 -- disconnect without running the match-reward calculation a second time.
 Players.PlayerRemoving:Connect(function(player)
 	EventWallet.Close(player)
-	if data[player.UserId] and EventWallet.Dirty(player) then
+	TimescalePurchase.Close(player)
+	if data[player.UserId] and (EventWallet.Dirty(player) or TimescalePurchase.Dirty(player)) then
 		disconnectSaves += 1
 		saveLoadedCurrency(player)
 		disconnectSaves -= 1
 	end
 	EventWallet.Forget(player)
+	TimescalePurchase.Forget(player)
 	data[player.UserId] = nil
 	rewardLock[player.UserId] = nil
 end)

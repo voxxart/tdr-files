@@ -643,7 +643,18 @@ end
 end
 ReplicatedStorage.Functions.TimescaleVoteNo.OnServerInvoke = round.TimescaleVoteNo
 
-function round.SpeedUp()
+local TimescalePurchase = require(game.ServerScriptService.TimescaleSystem.Purchase)
+local lastSpeedChange = -math.huge
+local function mayChangeSpeed(player)
+	if not player or not TimescalePurchase.Status(player).Owned then return false end
+	local now = os.clock()
+	if now - lastSpeedChange < 1 then return false end
+	lastSpeedChange = now
+	return true
+end
+
+function round.SpeedUp(player)
+	if not mayChangeSpeed(player) then return false end
 	local gameSpeed = workspace:FindFirstChild("Info") and workspace.Info:FindFirstChild("GameSpeed")
 	if gameSpeed and gameSpeed.Value == 1.5 then
 		gameSpeed.Value = 1
@@ -654,7 +665,8 @@ function round.SpeedUp()
 	end
 end
 
-function round.SpeedUp2()
+function round.SpeedUp2(player)
+	if not mayChangeSpeed(player) then return false end
 	local gameSpeed = workspace:FindFirstChild("Info") and workspace.Info:FindFirstChild("GameSpeed")
 	if gameSpeed and gameSpeed.Value == 1 then
 		gameSpeed.Value = 1.5
