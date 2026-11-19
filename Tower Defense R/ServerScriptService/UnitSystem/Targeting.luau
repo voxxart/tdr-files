@@ -11,11 +11,15 @@ local function enabled(model, name)
 	end
 	return value ~= nil and value.Value == true
 end
-function Targeting.CanDetect(model, stats, forDamage)
+function Targeting.CanDetect(model, stats, forDamage, attackConfig)
 	local hidden = stats:FindFirstChild('Hidden')
 	if hidden and hidden.Value and not enabled(model, 'HiddenDetection') then return false end
 	local lead = stats:FindFirstChild('Lead')
-	if forDamage and lead and lead.Value and not enabled(model, 'LeadDetection') then return false end
+	if forDamage and lead and lead.Value then
+		local override = attackConfig and attackConfig:FindFirstChild('LeadDetection')
+		local detectsLead = if override then override.Value == true else enabled(model, 'LeadDetection')
+		if not detectsLead then return false end
+	end
 	return true
 end
 function Targeting.Find(model, origin, range)

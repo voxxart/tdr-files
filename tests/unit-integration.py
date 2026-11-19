@@ -204,6 +204,21 @@ local actualTargeting=load('detection')
 assert(actualTargeting.Find(leadUnit,vec(0,0,0),12)==leadEnemy)
 leadUnit.Config.HiddenDetection.Value=false
 assert(actualTargeting.Find(leadUnit,vec(0,0,0),12)==nil)
+-- Secondary lead overrides are independent of the primary, including explicit false.
+leadEnemy.EnemyStats.Hidden=nil
+leadUnit.Config.SecondaryAttack=node({Range={Value=12},Damage={Value=20},Cooldown={Value=1},SplashRadius={Value=3},LeadDetection={Value=true}})
+local function dualShot(base,override,expected)
+ leadUnit.Config.LeadDetection.Value=base
+ leadUnit.Config.SecondaryAttack.LeadDetection=if override==nil then nil else {Value=override}
+ leadEnemy.EnemyStats.Health.Value=100
+ ld.NextPrimary=0;ld.NextSecondary=0
+ realCombat.Step(ld,10)
+ assert(leadEnemy.EnemyStats.Health.Value==expected,'secondary lead override leaked or failed')
+end
+dualShot(false,true,80)
+dualShot(true,false,90)
+dualShot(false,nil,100)
+dualShot(true,nil,70)
 -- Unit origin bookkeeping always accompanies credited tower damage.
 assert(credit:GetAttribute('UnitDamage')==credit.Value)
 print('Unit integration checks passed: shared movement, pause/speed, snapshot, match cleanup, path end, damage, shields, ram, ownership')

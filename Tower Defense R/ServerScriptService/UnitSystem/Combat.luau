@@ -13,10 +13,10 @@ local function eligible(mob, model)
 	return hp ~= nil and hp.Value > 0 and not stats:FindFirstChild('Invincible')
 		and not (flying and flying.Value) and Targeting.CanDetect(model,stats,false)
 end
-local function hit(data,mob,amount,explosion)
+local function hit(data,mob,amount,explosion,attackConfig)
 	if not alive(data) then return end
 	local stats = mob:FindFirstChild('EnemyStats')
-	if not stats or not Targeting.CanDetect(data.Model,stats,true) then return end
+	if not stats or not Targeting.CanDetect(data.Model,stats,true,attackConfig) then return end
 	local damageType = data.Config and data.Config:FindFirstChild('DamageType')
 	local kind = if explosion then data.Definition.SecondaryDamageType or 'Explosion' else data.Definition.DamageType or (damageType and damageType.Value) or 'None'
 	local actual = Damage.Apply(stats,amount,explosion,kind)
@@ -100,7 +100,7 @@ function Combat.Step(data, now)
 				Spatial.Visit(position,radius.Value,function(mob)
 					local stats = mob:FindFirstChild('EnemyStats')
 					local flying = stats and stats:FindFirstChild('Flying')
-					if stats and not stats:FindFirstChild('Invincible') and not (flying and flying.Value) then hit(data,mob,damage.Value,true) end
+					if stats and not stats:FindFirstChild('Invincible') and not (flying and flying.Value) then hit(data,mob,damage.Value,true,secondary) end
 				end)
 			end
 		end
