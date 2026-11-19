@@ -4,6 +4,7 @@ local Definitions = require(Rep.GameModules.UnitDefinitions)
 local Runtime = require(script.Parent.Runtime)
 local Behaviors = require(script.Parent.Behaviors)
 local Damage = require(script.Parent.Damage)
+local Targeting = require(script.Parent.Targeting)
 local UnitStopAttackEvent, RotateTorsoEvent = Rep.Events.UnitStopAttack, Rep.Events.RotateTorso
 local UnitDeathEvent = Rep.Events:FindFirstChild('UnitDeath')
 if not UnitDeathEvent then UnitDeathEvent=Instance.new('RemoteEvent'); UnitDeathEvent.Name='UnitDeath'; UnitDeathEvent.Parent=Rep.Events end
@@ -31,7 +32,7 @@ local function deathSplash(newunit, position)
 		local hp = enemyStats and enemyStats:FindFirstChild("Health")
 		if hit and hp and hp.Value > 0 and not enemyStats:FindFirstChild("Invincible") then
 			local flying = enemyStats:FindFirstChild("Flying")
-			if not (flying and flying.Value) then
+			if not (flying and flying.Value) and Targeting.CanDetect(newunit,enemyStats,true) then
 				local dx = hit.Position.X - position.X
 				local dz = hit.Position.Z - position.Z
 				if dx*dx + dz*dz <= radiusSq then

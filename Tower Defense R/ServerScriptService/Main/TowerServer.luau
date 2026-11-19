@@ -383,7 +383,8 @@ end)
 -- REAPER SOUL COLLECTION (SERVER-AUTHORITATIVE)
 --
 -- Earn one soul per Config.Reaper.SoulCollectionRate damage added to
--- Config.TotalDamage, with a hard cap of Config.Reaper.MaxSouls.
+-- Config.TotalDamage from the tower itself, excluding UnitDamage,
+-- with a hard cap of Config.Reaper.MaxSouls.
 -- Damage earned while at the cap is discarded, NOT banked. Spending souls
 -- therefore does not re-credit old damage. Unfinished damage only carries
 -- over while the tower has room for more souls.
@@ -439,11 +440,13 @@ local function registerReaperSoulTracking(model)
 	end
 
 	local startingDamage = math_max(0, totalDamage.Value)
+	local startingUnitDamage = totalDamage:GetAttribute("UnitDamage") or 0
 	local startingRate = rate.Value
 	local state = {
 		LastTotal = startingDamage,
+		LastUnitDamage = startingUnitDamage,
 		Remainder = startingRate > 0 and startingRate < math_huge
-			and (startingDamage % startingRate) or 0,
+			and (math_max(0, startingDamage - startingUnitDamage) % startingRate) or 0,
 		Connections = {},
 	}
 	ReaperSoulTracking[model] = state
@@ -459,8 +462,12 @@ local function registerReaperSoulTracking(model)
 		local currentTotal = totalDamage.Value
 		if currentTotal ~= currentTotal or currentTotal == math_huge then return end
 		currentTotal = math_max(0, currentTotal)
-		local delta = currentTotal - state.LastTotal
+		local rawDelta = currentTotal - state.LastTotal
+		local unitDamage = totalDamage:GetAttribute("UnitDamage") or 0
+		local unitDelta = math_max(0, unitDamage - state.LastUnitDamage)
+		local delta = rawDelta - unitDelta
 		state.LastTotal = currentTotal
+		state.LastUnitDamage = unitDamage
 
 		if delta < 0 then
 			state.Remainder = 0
@@ -3421,19 +3428,30 @@ end
 
 function tower.AOE(targeted, obj, maxHits)
 	local count = 0
+	local config = obj.Config
+	local function detects(name)
+		local flag = config:FindFirstChild(name)
+		return flag and flag.Value == true
+	end
 	for mob in pairs(MobSet) do
 		if count >= maxHits then break end
 		if mob == targeted then continue end
-		local hit   = mob:FindFirstChild("Hitbox")
+		local hit = mob:FindFirstChild("Hitbox")
 		local stats = mob:FindFirstChild("EnemyStats")
-		if hit and stats and (hit.Position - obj.HumanoidRootPart.Position).Magnitude <= obj.Config.Range.Value then
+		local health = stats and stats:FindFirstChild("Health")
+		if not hit or not health or health.Value <= 0 or stats:FindFirstChild("Invincible") then continue end
+		local lead, flying, hidden = stats:FindFirstChild("Lead"), stats:FindFirstChild("Flying"), stats:FindFirstChild("Hidden")
+		if lead and lead.Value and not detects("LeadDetection") then continue end
+		if flying and flying.Value and not detects("FlyingDetection") then continue end
+		if hidden and hidden.Value and not detects("HiddenDetection") then continue end
+		if (hit.Position - obj.HumanoidRootPart.Position).Magnitude <= config.Range.Value then
 			local shield = stats:FindFirstChild("ShieldHealth")
 			if shield and shield.Health.Value > 0 then
-				shield.Health.Value -= obj.Config.Damage.Value
+				shield.Health.Value = math_max(0, shield.Health.Value - config.Damage.Value)
 			else
-				stats.Health.Value -= obj.Config.Damage.Value
-				count += 1
+				health.Value = math_max(0, health.Value - config.Damage.Value)
 			end
+			count += 1
 		end
 	end
 end

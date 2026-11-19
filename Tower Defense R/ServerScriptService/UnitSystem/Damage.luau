@@ -2,6 +2,11 @@ local Players = game:GetService('Players')
 local math_max, math_round = math.max, math.round
 local EnemyRuntime = require(game.ServerScriptService.EnemySystem.EnemyRuntime)
 local Damage = {}
+local function creditCounter(counter, amount)
+	-- Record origin before changing TotalDamage, so soul listeners see it atomically.
+	counter:SetAttribute('UnitDamage', (counter:GetAttribute('UnitDamage') or 0) + amount)
+	counter.Value += amount
+end
 function Damage.Credit(newunit, damage)
 	if not newunit or damage <= 0 then
 		return
@@ -19,7 +24,7 @@ function Damage.Credit(newunit, damage)
 		and linkedDamage.Parent
 		and linkedDamage:IsA("ValueBase")
 	then
-		linkedDamage.Value += damage
+		creditCounter(linkedDamage, damage)
 		return
 	end
 
@@ -41,7 +46,7 @@ function Damage.Credit(newunit, damage)
 		return
 	end
 
-	totalDamage.Value += damage
+	creditCounter(totalDamage, damage)
 end
 
 function Damage.Apply(stats, damage, isExplosion, damageType)

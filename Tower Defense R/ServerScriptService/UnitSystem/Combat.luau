@@ -6,17 +6,17 @@ local Combat = {}
 local function alive(data)
 	return not data.Cleaned and data.Model.Parent ~= nil and data.Health.Value > 0 and data.Model:GetAttribute('Dead') ~= true
 end
-local function eligible(mob, config)
+local function eligible(mob, model)
 	local stats = mob and mob:FindFirstChild('EnemyStats')
 	local hp = stats and stats:FindFirstChild('Health')
 	local flying = stats and stats:FindFirstChild('Flying')
 	return hp ~= nil and hp.Value > 0 and not stats:FindFirstChild('Invincible')
-		and not (flying and flying.Value) and (not stats:FindFirstChild('Lead') or config:FindFirstChild('LeadDetection') ~= nil)
+		and not (flying and flying.Value) and Targeting.CanDetect(model,stats,false)
 end
 local function hit(data,mob,amount,explosion)
 	if not alive(data) then return end
 	local stats = mob:FindFirstChild('EnemyStats')
-	if not stats then return end
+	if not stats or not Targeting.CanDetect(data.Model,stats,true) then return end
 	local damageType = data.Config and data.Config:FindFirstChild('DamageType')
 	local kind = if explosion then data.Definition.SecondaryDamageType or 'Explosion' else data.Definition.DamageType or (damageType and damageType.Value) or 'None'
 	local actual = Damage.Apply(stats,amount,explosion,kind)
@@ -43,7 +43,7 @@ function Combat.Step(data, now)
 		local cooldown = config:FindFirstChild('Cooldown')
 		if range and damage and cooldown then
 			local target = Targeting.Find(data.Model,data.Hitbox.Position,primary.Range or range.Value)
-			if target and eligible(target,config) then
+			if target and eligible(target,data.Model) then
 				local interval = math.max(primary.Cooldown or cooldown.Value,0.05)
 				local duration = interval / math.max(workspace.Info.GameSpeed.Value,0.05)
 				if data.NoStop then
@@ -58,7 +58,7 @@ function Combat.Step(data, now)
 				data.Faced = target; data.LastAttack = now; data.NextPrimary = now + interval
 				Rep.Events.AnimateUnit:FireAllClients(data.Model,'Attack',target)
 				local function damageTarget(mob)
-					if not eligible(mob,config) then return end
+					if not eligible(mob,data.Model) then return end
 					local stats = mob.EnemyStats
 					local defense = stats:FindFirstChild('Defense')
 					local reduction = defense and defense:FindFirstChild('DefenseValue')
@@ -115,13 +115,14 @@ function Combat.Ram(data,finish)
 		local stats = mob:FindFirstChild('EnemyStats')
 		local hp = stats and stats:FindFirstChild('Health')
 		local flying = stats and stats:FindFirstChild('Flying')
-		if hp and hp.Value > 0 and not (flying and flying.Value) then selected = mob end
+		if hp and hp.Value > 0 and not (flying and flying.Value)
+			and Targeting.CanDetect(data.Model,stats,false) then selected = mob end
 	end)
 	if not selected then return end
 	local stats = selected.EnemyStats
 	local enemyHP, unitHP = stats.Health.Value, data.Health.Value
 	local invincible = stats:FindFirstChild('Invincible') ~= nil
-	local actual = if invincible then 0 else Damage.Apply(stats,unitHP,false,data.Definition.RamDamageType or 'Melee')
+	local actual = if invincible or not Targeting.CanDetect(data.Model,stats,true) then 0 else Damage.Apply(stats,unitHP,false,data.Definition.RamDamageType or 'Melee')
 	Damage.Credit(data.Model,actual); Damage.Reward(actual)
 	data.Health.Value = math.max(0,unitHP-(if invincible then 5000 else enemyHP))
 	if data.Health.Value <= 0 then finish(data.Model,true,true) end

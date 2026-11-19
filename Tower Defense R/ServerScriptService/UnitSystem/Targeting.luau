@@ -2,6 +2,22 @@ local Spatial = require(game.ServerScriptService.TowerSystem.Targeting)
 local EnemyRuntime = require(game.ServerScriptService.EnemySystem.EnemyRuntime)
 local Policy = require(game.ServerScriptService.Simulation.TargetPolicy)
 local Targeting = {}
+local function enabled(model, name)
+	local config = model:FindFirstChild('Config')
+	local value = config and config:FindFirstChild(name)
+	if not value then
+		local stats = model:FindFirstChild('EnemyStats')
+		value = stats and stats:FindFirstChild(name)
+	end
+	return value ~= nil and value.Value == true
+end
+function Targeting.CanDetect(model, stats, forDamage)
+	local hidden = stats:FindFirstChild('Hidden')
+	if hidden and hidden.Value and not enabled(model, 'HiddenDetection') then return false end
+	local lead = stats:FindFirstChild('Lead')
+	if forDamage and lead and lead.Value and not enabled(model, 'LeadDetection') then return false end
+	return true
+end
 function Targeting.Find(model, origin, range)
 	local ownerValue = model:FindFirstChild('OwnerTower')
 	local owner = ownerValue and ownerValue.Value
@@ -17,6 +33,7 @@ function Targeting.Find(model, origin, range)
 		if not hitbox or not hp or hp.Value <= 0 then return end
 		local flying = stats:FindFirstChild('Flying')
 		if flying and flying.Value then return end
+		if not Targeting.CanDetect(model, stats, false) then return end
 		local aggro = stats:FindFirstChild('Aggro') ~= nil
 		local maxHp = stats:FindFirstChild('MaxHealth')
 		if not aggro and ownerConfig and ownerConfig:FindFirstChild('BeamerSettings') and maxHp and maxHp.Value < 500 then return end

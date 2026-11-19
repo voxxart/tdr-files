@@ -7,6 +7,7 @@ def literal(text):
     while ']'+eq+']' in text: eq+='='
     return '['+eq+'['+text+']'+eq+']'
 paths={
+    'detection':'ServerScriptService/UnitSystem/Targeting.luau',
     'runtime':'ServerScriptService/UnitSystem/Runtime.luau',
     'motion':'ServerScriptService/Simulation/UnitMotion.luau',
     'damage':'ServerScriptService/UnitSystem/Damage.luau',
@@ -56,8 +57,8 @@ local chosen,spatialList=nil,{}
 local enemyRecords={}
 local enemyRuntime={Get=function(model) return enemyRecords[model] end}
 local spatial={Visit=function(_,_,callback) for _,model in spatialList do callback(model) end end}
-local modules={match=Match,definitions=definitions,enemyRuntime=enemyRuntime,spatial=spatial,
-    targeting={Find=function() return chosen end}}
+local modules={policy={Better=function(_,best) return best==nil end},match=Match,definitions=definitions,enemyRuntime=enemyRuntime,spatial=spatial,
+    targeting={Find=function() return chosen end,CanDetect=function() return true end}}
 local info=node({GameSpeed={Value=1},EnemyInGame=node({Value=0})})
 local workspace={Info=info,Mobs=node({})}
 local moved=0
@@ -69,7 +70,7 @@ end
 local warnings=0
 local environment=setmetatable({
     warn=function() warnings+=1 end,
-    game={ServerScriptService={Simulation={MatchService='match',UnitMotion='motion'},EnemySystem={EnemyRuntime='enemyRuntime'},TowerSystem={Targeting='spatial'}},
+    game={ServerScriptService={Simulation={MatchService='match',UnitMotion='motion',TargetPolicy='policy'},EnemySystem={EnemyRuntime='enemyRuntime'},TowerSystem={Targeting='spatial'}},
         GetService=function(_,name)
             if name=='ReplicatedStorage' then return rep end
             if name=='RunService' then return {Heartbeat=heartbeat} end
@@ -83,6 +84,7 @@ local environment=setmetatable({
 local function load(name)
     local fn=assert(loadstring(sources[name],name)); setfenv(fn,environment); return fn()
 end
+modules.targeting.CanDetect=load('detection').CanDetect
 modules.runtime=load('runtime'); modules.motion=load('motion'); modules.damage=load('damage'); modules.behaviors=load('behaviors')
 modules.paths={Sample=function(_,alpha) return vec(alpha*100,0,0) end}
 modules.death=load('death')
@@ -181,6 +183,29 @@ spatialList={other}
 realCombat.Ram(combatData,function(_,died,ram) assert(died and ram); finished+=1 end)
 assert(combatData.Health.Value==0 and other.EnemyStats.Health.Value==90 and finished==1)
 assert(enemy.Parent~=nil, 'Unit combat must leave enemy destruction/counting to EnemyService')
+-- Lead remains attackable, but detection is needed to deal damage.
+local leadEnemy=node({EnemyStats=node({Health=node({Value=100}),Lead={Value=true}}),Hitbox=node({Position=vec(1,0,0)})})
+chosen=leadEnemy;spatialList={leadEnemy}
+local leadUnit=unit('LeadTest');leadUnit.Config=node({Range={Value=12},Damage={Value=10},Cooldown={Value=1}})
+local ld={Model=leadUnit,Health=leadUnit.EnemyStats.Health,Hitbox=leadUnit.Hitbox,Config=leadUnit.Config,
+ Definition={},Attacks=true,NoStop=true,NextPrimary=0,NextSecondary=100,Cleaned=false}
+local attacks=emissions.AnimateUnit or 0
+realCombat.Step(ld,0)
+assert((emissions.AnimateUnit or 0)==attacks+1 and leadEnemy.EnemyStats.Health.Value==100)
+leadUnit.Config.LeadDetection={Value=false};realCombat.Step(ld,1)
+assert(leadEnemy.EnemyStats.Health.Value==100,'false detection damaged lead')
+leadUnit.Config.LeadDetection.Value=true;realCombat.Step(ld,2)
+assert(leadEnemy.EnemyStats.Health.Value==90)
+leadEnemy.EnemyStats.Hidden={Value=true};realCombat.Step(ld,3)
+assert(leadEnemy.EnemyStats.Health.Value==90)
+leadUnit.Config.HiddenDetection={Value=true};realCombat.Step(ld,4)
+assert(leadEnemy.EnemyStats.Health.Value==80)
+local actualTargeting=load('detection')
+assert(actualTargeting.Find(leadUnit,vec(0,0,0),12)==leadEnemy)
+leadUnit.Config.HiddenDetection.Value=false
+assert(actualTargeting.Find(leadUnit,vec(0,0,0),12)==nil)
+-- Unit origin bookkeeping always accompanies credited tower damage.
+assert(credit:GetAttribute('UnitDamage')==credit.Value)
 print('Unit integration checks passed: shared movement, pause/speed, snapshot, match cleanup, path end, damage, shields, ram, ownership')
 '''
 with tempfile.TemporaryDirectory() as directory:
