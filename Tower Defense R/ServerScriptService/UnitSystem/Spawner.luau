@@ -3,6 +3,7 @@ local Match = require(game.ServerScriptService.Simulation.MatchService)
 local Paths = require(script.Parent.Paths)
 local Service = require(script.Parent.Service)
 local Templates = require(script.Parent.TemplateResolver)
+local Preparation = require(script.Parent.TemplatePreparation)
 
 local Spawner = {}
 function Spawner.Spawn(name, quantity, cooldown, healthMultiplier, speedMultiplier, map, ownerTower, canContinue)
@@ -13,6 +14,9 @@ function Spawner.Spawn(name, quantity, cooldown, healthMultiplier, speedMultipli
 		warn("No unit template found:", name, "(checked tower skin, Default, and legacy Units)")
 		return
 	end
+
+	-- Also prepare on demand: startup order and newly added skins are safe.
+	if not Preparation.Prepare(unitExists) then return end
 
 	local info = workspace:WaitForChild("Info")
 

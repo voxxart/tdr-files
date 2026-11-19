@@ -1,18 +1,15 @@
-for _, unit in ipairs(game.ReplicatedStorage.Units:GetChildren()) do
-	if not unit:FindFirstChild("Hitbox") then
-		local hrp = unit:FindFirstChild("HumanoidRootPart")
-		if hrp then
-			local hitBox = hrp:Clone()
-			for _, child in ipairs(hitBox:GetChildren()) do
-				child:Destroy()
-			end
-			hitBox.Name = "Hitbox"
-			hitBox.CanCollide = false
-			hitBox.Anchored = true
-			hitBox.CanTouch = true
-			hitBox.Parent = unit
-		else
-			warn("Unit " .. unit.Name .. " is missing a HumanoidRootPart.")
-		end
-	end
+local Rep = game:GetService('ReplicatedStorage')
+local Preparation = require(script.Parent.UnitSystem.TemplatePreparation)
+local units = Rep:WaitForChild('Units')
+
+-- Only descend through organizational folders, not nested rig/accessory Models.
+local function prepareFolder(folder)
+ for _,child in folder:GetChildren() do
+  if child:IsA('Folder') then
+   prepareFolder(child)
+  elseif child:IsA('Model') then
+   Preparation.Prepare(child)
+  end
+ end
 end
+prepareFolder(units)
