@@ -102,7 +102,6 @@ local setTimeText = ReplicatedStorage.Events:WaitForChild("SetTextTime")
 
 local SpeedupFunction = ReplicatedStorage.Functions:WaitForChild("SpeedUp1")
 local SpeedupFunction2 = ReplicatedStorage.Functions:WaitForChild("SpeedUp2")
-local CooldownSpeedUP = ReplicatedStorage.Events:WaitForChild("SpeedupCooldown")
 
 
 local Match = require(game.ServerScriptService.Simulation.MatchService)
@@ -621,62 +620,19 @@ function round.Skip(player,wave)
 end
 voteSkip.OnServerInvoke = round.Skip
 
-function round.TimescaleVote()
-	info.TimescaleVote.Value += 1
-	if workspace.Info.PlrValue.Value > 0 then
-		if info.TimescaleVote.Value == (workspace.Info.PlrValue.Value) then
-			ReplicatedStorage.Events.TimescaleVoteWin:FireAllClients(true, true)
-			info.TimescaleVote.Value = 0
-		end
+local TimescaleControl = require(game.ServerScriptService.TimescaleSystem.Controller)
+function round.TimescaleVote(player, voteId)
+	return TimescaleControl.Vote(player, voteId, true)
+end
+function round.TimescaleVoteNo(player, voteId)
+	return TimescaleControl.Vote(player, voteId, false)
 end
 ReplicatedStorage.Functions.TimescaleVote.OnServerInvoke = round.TimescaleVote
-
-function round.TimescaleVoteNo()
-		info.TimescaleVoteNo.Value += 1
-		if workspace.Info.PlrValue.Value > 0 then
-			if info.TimescaleVoteNo.Value == (workspace.Info.PlrValue.Value) then
-				ReplicatedStorage.Events.TimescaleVoteWin:FireAllClients(false, false)
-				info.TimescaleVoteNo.Value = 0
-			end
-		end
-end
-end
 ReplicatedStorage.Functions.TimescaleVoteNo.OnServerInvoke = round.TimescaleVoteNo
 
-local TimescalePurchase = require(game.ServerScriptService.TimescaleSystem.Purchase)
-local lastSpeedChange = -math.huge
-local function mayChangeSpeed(player)
-	if not player or not TimescalePurchase.Status(player).Owned then return false end
-	local now = os.clock()
-	if now - lastSpeedChange < 1 then return false end
-	lastSpeedChange = now
-	return true
-end
-
-function round.SpeedUp(player)
-	if not mayChangeSpeed(player) then return false end
-	local gameSpeed = workspace:FindFirstChild("Info") and workspace.Info:FindFirstChild("GameSpeed")
-	if gameSpeed and gameSpeed.Value == 1.5 then
-		gameSpeed.Value = 1
-		print("Speeding up game. New value:", gameSpeed.Value)
-		CooldownSpeedUP:FireAllClients()
-	else
-		warn("SpeedUp failed: GameSpeed not found or already 2")
-	end
-end
-
-function round.SpeedUp2(player)
-	if not mayChangeSpeed(player) then return false end
-	local gameSpeed = workspace:FindFirstChild("Info") and workspace.Info:FindFirstChild("GameSpeed")
-	if gameSpeed and gameSpeed.Value == 1 then
-		gameSpeed.Value = 1.5
-		print("Slowing game down. New value:", gameSpeed.Value)
-		CooldownSpeedUP:FireAllClients()
-	else
-		warn("SpeedUp2 failed: GameSpeed not found or already 1")
-	end
-end
-
+-- Legacy endpoints use the same authoritative vote/cooldown rules.
+function round.SpeedUp(player) return TimescaleControl.Request(player, 1.5) end
+function round.SpeedUp2(player) return TimescaleControl.Request(player, 1) end
 SpeedupFunction.OnServerInvoke = round.SpeedUp
 SpeedupFunction2.OnServerInvoke = round.SpeedUp2
 

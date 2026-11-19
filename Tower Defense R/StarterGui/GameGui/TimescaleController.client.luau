@@ -75,16 +75,13 @@ connections[#connections+1]=toggle.Activated:Connect(function()
   status()
   return
  end
- -- Existing 1x / 1.5x endpoints; server rechecks loaded ownership.
- local speed=info.GameSpeed.Value
- local name=if speed==1 then 'SpeedUp2' elseif speed==1.5 then 'SpeedUp1' else nil
- if not name then return end
- local endpoint=functions:FindFirstChild(name)
- if not endpoint then return end
+ local endpoint=functions:WaitForChild('RequestTimescale')
  speedBusy=true
- local ok=pcall(endpoint.InvokeServer,endpoint)
- if not ok and alive then errorMessage('Unable to change timescale. Please try again.') end
- task.delay(1,function() speedBusy=false end)
+ local ok,result=pcall(endpoint.InvokeServer,endpoint)
+ speedBusy=false
+ if not alive then return end
+ if not ok then errorMessage('Unable to change timescale. Please try again.')
+ elseif type(result)=='table' and not result.Success and result.Error then errorMessage(result.Error) end
 end)
 connections[#connections+1]=purchase.Activated:Connect(function()
  if busy or not menu.Visible then return end

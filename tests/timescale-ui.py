@@ -46,7 +46,7 @@ local remote={InvokeServer=function(_,action)
  player:SetAttribute('UnlockedTimescale',1)
  return {Success=true,Changed=true}
 end}
-local functions=node({PurchaseTimescale=remote,SpeedUp2={InvokeServer=function() speedCalls+=1 end},SpeedUp1={InvokeServer=function() speedCalls+=1 end}})
+local functions=node({PurchaseTimescale=remote,RequestTimescale={InvokeServer=function() speedCalls+=1;return {Success=true} end}})
 local rep=node({Functions=functions})
 local game={GetService=function(_,name) return if name=='Players' then {LocalPlayer=player} else rep end}
 local workspace=node({Info={GameSpeed={Value=1}}})
