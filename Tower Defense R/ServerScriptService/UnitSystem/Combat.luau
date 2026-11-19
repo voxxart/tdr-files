@@ -122,7 +122,7 @@ function Combat.Ram(data,finish)
 	local stats = selected.EnemyStats
 	local enemyHP, unitHP = stats.Health.Value, data.Health.Value
 	local invincible = stats:FindFirstChild('Invincible') ~= nil
-	local actual = if invincible or not Targeting.CanDetect(data.Model,stats,true) then 0 else Damage.Apply(stats,unitHP,false,data.Definition.RamDamageType or 'Melee')
+	local actual = if invincible then 0 else Damage.Apply(stats,unitHP,false,data.Definition.RamDamageType or 'Melee')
 	Damage.Credit(data.Model,actual); Damage.Reward(actual)
 	data.Health.Value = math.max(0,unitHP-(if invincible then 5000 else enemyHP))
 	if data.Health.Value <= 0 then finish(data.Model,true,true) end

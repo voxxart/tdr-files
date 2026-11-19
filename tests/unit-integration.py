@@ -176,6 +176,7 @@ realCombat.Step(secondaryData,2); realCombat.Step(secondaryData,3)
 assert(blast.EnemyStats.Health.Value==40 and enemyRecords[blast].LastDamageType=='Explosion')
 chosen=enemy; spatialList={enemy}
 local finished=0
+enemy.EnemyStats.Lead={Value=true} -- Ramming ignores lead detection.
 realCombat.Ram(combatData,function() finished+=1 end)
 assert(enemy.EnemyStats.Health.Value==0 and combatData.Health.Value==10 and finished==0)
 local other=node({EnemyStats=node({Health=node({Value=100})}),Hitbox=node({Position=vec(1,0,0)})})
