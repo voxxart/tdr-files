@@ -105,5 +105,14 @@ script.Destroying:Connect(function()
  alive=false
  for _,connection in connections do connection:Disconnect() end
 end)
+local function updateSpeedLabel()
+ local timescale=gui:FindFirstChild('Timescale')
+ local label=timescale and timescale:FindFirstChild('ButtonNumber')
+ if label and (label:IsA('TextLabel') or label:IsA('TextButton') or label:IsA('TextBox')) then
+  label.Text=tostring(info.GameSpeed.Value)..'x'
+ end
+end
+connections[#connections+1]=info.GameSpeed.Changed:Connect(updateSpeedLabel)
+updateSpeedLabel()
 render()
 task.spawn(status)

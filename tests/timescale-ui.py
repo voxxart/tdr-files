@@ -36,7 +36,8 @@ function successTemplate:Clone()
  shown=node({Main=label});function shown:Destroy() self.Parent=nil end
  return shown
 end
-local gui=node({Sounds=node({PurchasedSuccessful=successSound}),Messages=node({Message=successTemplate}),PurchaseTimescale=menu,Misc=node({Timescale=node({Button=main})})})
+local speedLabel=node();speedLabel.Kind='TextLabel'
+local gui=node({Timescale=node({ButtonNumber=speedLabel}),Sounds=node({PurchasedSuccessful=successSound}),Messages=node({Message=successTemplate}),PurchaseTimescale=menu,Misc=node({Timescale=node({Button=main})})})
 local statusCalls,purchases,speedCalls=0,0,0
 local remote={InvokeServer=function(_,action)
  if action=='Status' then statusCalls+=1;return {Price=500} end
@@ -49,14 +50,17 @@ end}
 local functions=node({PurchaseTimescale=remote,RequestTimescale={InvokeServer=function() speedCalls+=1;return {Success=true} end}})
 local rep=node({Functions=functions})
 local game={GetService=function(_,name) return if name=='Players' then {LocalPlayer=player} else rep end}
-local workspace=node({Info={GameSpeed={Value=1}}})
+local speed=node();speed.Value=1;speed.Changed=signal()
+local workspace=node({Info={GameSpeed=speed}})
 local script=node();function script:FindFirstAncestorWhichIsA() return gui end
 script.Destroying=signal()
 local errors={}
 local warn=function(s) table.insert(errors,s) end
 local task={spawn=function(f) f() end,delay=function() end}
 '''+source+r'''
-assert(not menu.Visible and label.Text=='200')
+assert(not menu.Visible and label.Text=='200' and speedLabel.Text=='1x')
+speed.Value=1.5;speed.Changed:Fire();assert(speedLabel.Text=='1.5x')
+speed.Value=1;speed.Changed:Fire()
 main.Activated:Fire();assert(menu.Visible and message.Visible)
 assert(message.Text.Text=='Authored purchase message')
 buy.Activated:Fire();assert(menu.Visible and errors[1]=='You need 300 gems to purchase this!')
