@@ -34,6 +34,23 @@ local function errorMessage(text)
  if sound then sound:Play() end
  task.delay(3,function() copy:Destroy() end)
 end
+local function purchaseSuccess()
+ local sounds=gui:FindFirstChild('Sounds')
+ local sound=sounds and sounds:FindFirstChild('PurchasedSuccessful')
+ if sound and sound:IsA('Sound') then sound:Play() end
+ local area=gui:FindFirstChild('Messages')
+ local template=area and area:FindFirstChild('Message')
+ if not template then return end
+ local copy=template:Clone()
+ for _,name in {'Main','Main2','Message'} do
+  local label=copy:FindFirstChild(name)
+  if label and (label:IsA('TextLabel') or label:IsA('TextButton')) then
+   label.Text='Successfully purchased Timescale!'
+  end
+ end
+ copy.Visible=true;copy.Parent=area
+ task.delay(3,function() copy:Destroy() end)
+end
 local function render()
  if not alive then return end
  local ready=player:GetAttribute('TimescalePurchaseReady')==true
@@ -78,7 +95,9 @@ connections[#connections+1]=purchase.Activated:Connect(function()
  busy=false
  if not alive then return end
  if ok and type(result)=='table' then
-  if result.Success then menu.Visible=false
+  if result.Success then
+   menu.Visible=false
+   if result.Changed then purchaseSuccess() end
   elseif result.Error then errorMessage(result.Error) end
  else errorMessage('Unable to purchase timescale. Please try again.') end
  render()

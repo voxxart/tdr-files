@@ -27,7 +27,16 @@ player:SetAttribute('TimescaleGems',200)
 player:SetAttribute('UnlockedTimescale',0)
 local main=node();local buy=node();local close=node();local label=node();local message=node({Text=node()})
 local menu=node({Actions=node({Purchase=node({Button=buy})}),Close=close,Gems=node({Amount=label}),Message=message})
-local gui=node({PurchaseTimescale=menu,Misc=node({Timescale=node({Button=main})})})
+local successSound=node();successSound.Kind='Sound'
+local plays=0;function successSound:Play() plays+=1 end
+local successTemplate=node()
+local shown
+function successTemplate:Clone()
+ local label=node();label.Kind='TextLabel'
+ shown=node({Main=label});function shown:Destroy() self.Parent=nil end
+ return shown
+end
+local gui=node({Sounds=node({PurchasedSuccessful=successSound}),Messages=node({Message=successTemplate}),PurchaseTimescale=menu,Misc=node({Timescale=node({Button=main})})})
 local statusCalls,purchases,speedCalls=0,0,0
 local remote={InvokeServer=function(_,action)
  if action=='Status' then statusCalls+=1;return {Price=500} end
@@ -35,7 +44,7 @@ local remote={InvokeServer=function(_,action)
  if player:GetAttribute('TimescaleGems')<500 then return {Success=false,Error='You need 300 gems to purchase this!'} end
  player:SetAttribute('TimescaleGems',player:GetAttribute('TimescaleGems')-500)
  player:SetAttribute('UnlockedTimescale',1)
- return {Success=true}
+ return {Success=true,Changed=true}
 end}
 local functions=node({PurchaseTimescale=remote,SpeedUp2={InvokeServer=function() speedCalls+=1 end},SpeedUp1={InvokeServer=function() speedCalls+=1 end}})
 local rep=node({Functions=functions})
@@ -54,6 +63,7 @@ close.Activated:Fire();assert(not menu.Visible)
 player:SetAttribute('TimescaleGems',800)
 main.Activated:Fire();assert(menu.Visible and not message.Visible and label.Text=='800')
 buy.Activated:Fire();assert(not menu.Visible and label.Text=='300')
+assert(plays==1 and shown.Main.Text=='Successfully purchased Timescale!' and shown.Visible)
 main.Activated:Fire();assert(speedCalls==1 and not menu.Visible)
 assert(purchases==2)
 script.Destroying:Fire()
