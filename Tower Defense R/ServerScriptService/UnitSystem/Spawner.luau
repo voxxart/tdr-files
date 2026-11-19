@@ -2,14 +2,15 @@ local RepStorage = game:GetService('ReplicatedStorage')
 local Match = require(game.ServerScriptService.Simulation.MatchService)
 local Paths = require(script.Parent.Paths)
 local Service = require(script.Parent.Service)
+local Templates = require(script.Parent.TemplateResolver)
 
 local Spawner = {}
 function Spawner.Spawn(name, quantity, cooldown, healthMultiplier, speedMultiplier, map, ownerTower, canContinue)
 	local generation = Match.Capture()
 	if not Match.IsCurrent(generation) then return end
-	local unitExists = RepStorage.Units:FindFirstChild(name)
+	local unitExists = Templates.Resolve(RepStorage:FindFirstChild('Units'), name, ownerTower)
 	if not unitExists then
-		warn("No unit found with name:", name)
+		warn("No unit template found:", name, "(checked tower skin, Default, and legacy Units)")
 		return
 	end
 
