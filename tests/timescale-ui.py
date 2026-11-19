@@ -25,7 +25,7 @@ local player=node()
 player:SetAttribute('TimescalePurchaseReady',true)
 player:SetAttribute('TimescaleGems',200)
 player:SetAttribute('UnlockedTimescale',0)
-local main=node();local buy=node();local close=node();local label=node();local message=node({Text=node()})
+local main=node();local buy=node();local close=node();local label=node();local message=node({Text=node()}); message.Text.Text='Authored purchase message'
 local menu=node({Actions=node({Purchase=node({Button=buy})}),Close=close,Gems=node({Amount=label}),Message=message})
 local successSound=node();successSound.Kind='Sound'
 local plays=0;function successSound:Play() plays+=1 end
@@ -58,6 +58,7 @@ local task={spawn=function(f) f() end,delay=function() end}
 '''+source+r'''
 assert(not menu.Visible and label.Text=='200')
 main.Activated:Fire();assert(menu.Visible and message.Visible)
+assert(message.Text.Text=='Authored purchase message')
 buy.Activated:Fire();assert(menu.Visible and errors[1]=='You need 300 gems to purchase this!')
 close.Activated:Fire();assert(not menu.Visible)
 player:SetAttribute('TimescaleGems',800)

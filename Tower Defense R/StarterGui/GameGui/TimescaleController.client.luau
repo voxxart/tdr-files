@@ -58,8 +58,6 @@ local function render()
  local balance=player:GetAttribute('TimescaleGems') or 0
  gems.Text=if ready then tostring(balance) else '...'
  message.Visible=ready and not owned and balance<price
- local label=message:FindFirstChildWhichIsA('TextLabel',true)
- if label then label.Text='You need '..tostring(math.max(0,math.ceil(price-balance)))..' gems to purchase this!' end
  purchase.Active=ready and not busy and not owned
  if owned then menu.Visible=false end
 end
