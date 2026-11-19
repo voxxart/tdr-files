@@ -69,13 +69,16 @@ return function(newTower, player, config, targetOverride)
 	elseif config:FindFirstChild("Shocker") then
 		tower.Shocker(target, newTower, player)
 	else
+		local actualDamage = 0
+		local lead = enemyStats:FindFirstChild("Lead")
+		local leadDetection = config:FindFirstChild("LeadDetection")
 		if enemyStats:FindFirstChild("Invincible") then
 			local shield = target:FindFirstChild("Hitbox") and target.Hitbox:FindFirstChild("Shield")
 			if shield then
 				local sound = shield:FindFirstChild('Attack')
 				if sound and sound:IsA('Sound') then sound:Play() end
 			end
-		elseif enemyStats:FindFirstChild("Lead") and not config:FindFirstChild("LeadDetection") then
+		elseif lead and lead.Value and not (leadDetection and leadDetection.Value == true) then
 			local ls = enemyStats:FindFirstChild("LeadSound")
 			if ls then ls:Play() end
 		else
@@ -107,11 +110,11 @@ return function(newTower, player, config, targetOverride)
 				end
 			end
 
-			dealtDamage = DirectDamage.Apply(target, config, finalDamage)
+			dealtDamage, actualDamage = DirectDamage.Apply(target, config, finalDamage)
 		end
 
-		if config:FindFirstChild("TotalDamage") then
-			config.TotalDamage.Value += dmg
+		if actualDamage > 0 and config:FindFirstChild("TotalDamage") then
+			config.TotalDamage.Value += actualDamage
 		end
 	end
 
