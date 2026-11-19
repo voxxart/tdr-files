@@ -79,6 +79,7 @@ function LightningBolt.new(Attachment0, Attachment1, PartCount)
 	--Bolt Appearance Properties
 
 	self.Jagged = false --Opt-in sharp, three-dimensional electrical kinks.
+	self.ShapeRefreshHz = 0 --Opt-in bounded shape updates for static snapshot bolts.
 	self.Static = false --Opt-in snapshot geometry: build once, then only update opacity.
 	self.Enabled = true --Hides bolt without removing any parts when false
 	self.Attachment0, self.Attachment1 = Attachment0, Attachment1 --Bolt originates from Attachment0 and ends at Attachment1
@@ -300,7 +301,9 @@ RunService.Heartbeat:Connect(function()
 
 	for _, ThisBranch in pairs(ActiveBranches) do
 		if ThisBranch.Enabled == true then
-			if ThisBranch.Static and ThisBranch._StaticRendered then
+			local refresh = math.clamp(ThisBranch.ShapeRefreshHz or 0, 0, 24)
+			if ThisBranch.Static and ThisBranch._StaticRendered
+				and (refresh == 0 or clock() - ThisBranch._GeometryT < 1 / refresh) then
 				local elapsed = clock() - ThisBranch._StartT
 				local lifetime = ThisBranch.StaticLifetime or (ThisBranch.PulseLength + 1) / ThisBranch.PulseSpeed
 				if elapsed >= lifetime then
@@ -328,7 +331,7 @@ RunService.Heartbeat:Connect(function()
 			local TimePassed = clock() - ThisBranch._StartT
 			local SpaceCurveFunction, RadialProfileFunction =
 				ThisBranch.SpaceCurveFunction, ThisBranch.RadialProfileFunction
-			local Lifetime = (ThisBranch.PulseLength + 1) / ThisBranch.PulseSpeed
+			local Lifetime = ThisBranch.StaticLifetime or (ThisBranch.PulseLength + 1) / ThisBranch.PulseSpeed
 
 			--Extract control points
 			local a0, a1, CurveSize0, CurveSize1 =
@@ -372,10 +375,11 @@ RunService.Heartbeat:Connect(function()
 						-- a smooth wave. The seed stays fixed for the entire shot.
 						local radius = math.min(MaxRadius, (p3 - p0).Magnitude / PartsN * 0.45)
 						local sample = i * 2.173 + 0.37
+						local seed = RanNum + (if refresh > 0 then math.floor(TimePassed * refresh) * 3.71 else 0)
 						NextPoint = bezier1 + Vector3.new(
-							math.noise(sample, RanNum, 11.7),
-							math.noise(sample, RanNum, 47.3),
-							math.noise(sample, RanNum, 83.9)
+							math.noise(sample, seed, 11.7),
+							math.noise(sample, seed, 47.3),
+							math.noise(sample, seed, 83.9)
 						) * (radius * 2)
 					else
 						local progress = PercentAlongBolt
@@ -409,6 +413,7 @@ RunService.Heartbeat:Connect(function()
 				end
 				if ThisBranch.Static then
 					ThisBranch._StaticRendered = true
+					ThisBranch._GeometryT = clock()
 					ThisBranch._StaticVisible = {}
 					for i, part in Parts do ThisBranch._StaticVisible[i] = part.Transparency < 1 end
 				end

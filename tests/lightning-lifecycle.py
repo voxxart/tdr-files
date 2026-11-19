@@ -73,6 +73,12 @@ for i=1,5 do if math.abs(points[i].Y)>0.001 then hasKink=true end end
 assert(hasKink,'jagged bolt has no vertical kinks')
 heartbeat.fn(); heartbeat.fn()
 assert(geometryCalls==6,'static bolt geometry rebuilt every frame')
+frozen.ShapeRefreshHz=18
+frozen._GeometryT=-100000
+heartbeat.fn()
+assert(geometryCalls==12,'timed shape refresh did not rebuild existing geometry')
+heartbeat.fn()
+assert(geometryCalls==12,'shape refresh ignored rate limit')
 frozen._StartT=-100000
 heartbeat.fn()
 assert(frozen._Destroyed,'static lifetime did not expire')

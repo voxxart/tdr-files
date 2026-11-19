@@ -47,12 +47,13 @@ local tower=node('Model',{Weapon=node('Folder',{Handle=node('Part',{Lightning=or
 local chain={}
 for i=1,8 do chain[i]=node('Model',{Hitbox=node('BasePart',{Position=pos(i*10)})}) end
 event:Fire(tower,chain)
-assert(#bolts==8,'must render all eight links')
+assert(#bolts==16,'must render two strands across all eight links')
 for i,b in bolts do
  assert(b.AnimationSpeed==0 and b.ColorOffsetSpeed==0)
- assert(b.Static==true and b.StaticLifetime==0.16)
+ assert(b.Static==true and b.StaticLifetime==0.16 and b.ShapeRefreshHz==18)
  assert(b.Jagged and b.MinThicknessMultiplier>0 and b.MinThicknessMultiplier<b.MaxThicknessMultiplier)
- assert(b.Start.WorldPosition.X==(i-1)*10 and b.Finish.WorldPosition.X==i*10)
+ local link=math.ceil(i/2)
+ assert(b.Start.WorldPosition.X==(link-1)*10 and b.Finish.WorldPosition.X==link*10)
  assert(b.OpacityProfileFunction(0.5,0)==1)
  assert(b.OpacityProfileFunction(0.5,0.14)>0 and b.OpacityProfileFunction(0.5,0.14)<1)
 end

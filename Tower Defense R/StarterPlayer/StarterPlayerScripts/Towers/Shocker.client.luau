@@ -10,6 +10,7 @@ local LIFETIME = 0.16
 local FADE_TIME = 0.04
 local MAX_PARTS = 768
 local COLOR = Color3.fromRGB(65, 180, 255)
+local CORE_COLOR = Color3.fromRGB(195, 240, 255)
 local active = {}
 local usedParts = 0
 local clock = os.clock
@@ -30,7 +31,7 @@ local function validPosition(position)
 		and math.abs(position.X) < 100000 and math.abs(position.Y) < 100000 and math.abs(position.Z) < 100000
 end
 
-local function createBolt(startPos, endPos, low)
+local function createBolt(startPos, endPos, low, secondary)
 	if not validPosition(startPos) or not validPosition(endPos) then return end
 	local distance = (endPos - startPos).Magnitude
 	if distance < 0.01 or distance > 512 then return end
@@ -44,13 +45,14 @@ local function createBolt(startPos, endPos, low)
 	bolt.Jagged = true
 	bolt.Static = true
 	bolt.StaticLifetime = LIFETIME
-	bolt.Color = COLOR
+	bolt.ShapeRefreshHz = if low then 12 else 18
+	bolt.Color = if secondary then CORE_COLOR else COLOR
 	bolt.ColorOffsetSpeed = 0
 	bolt.AnimationSpeed = 0
 	bolt.Frequency = 1
 	bolt.MinRadius = 0
-	bolt.MaxRadius = math.min(1.1, distance * 0.16)
-	bolt.Thickness = 0.095
+	bolt.MaxRadius = math.min(1.6, distance * 0.2)
+	bolt.Thickness = if secondary then 0.065 else 0.12
 	bolt.MinThicknessMultiplier = 0.65
 	bolt.MaxThicknessMultiplier = 1
 	bolt.ContractFrom = 2
@@ -70,7 +72,8 @@ local eventConnection = FXEvent.OnClientEvent:Connect(function(towerModel, chain
 	for _, target in ipairs(chain) do
 		local position = getHitPos(target)
 		if not position then break end
-		createBolt(previous, position, low)
+		createBolt(previous, position, low, false)
+		if not low then createBolt(previous, position, low, true) end
 		previous = position
 	end
 end)
